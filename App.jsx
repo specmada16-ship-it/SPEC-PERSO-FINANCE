@@ -88,47 +88,27 @@ const load = (k,d) => { try{ const v=localStorage.getItem(k); return v?JSON.pars
 const save = (k,v) => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} };
 
 // ─── PIN LOCK ─────────────────────────────────────────────────────────────────
-const DEFAULT_PIN = "0000"; // changed on first setup
+// Single shared code, defined by the app owner via "Changer le code" (inside the
+// app, after already being unlocked). New visitors only ever see "enter the code" —
+// they can never create or reset it themselves.
+const DEFAULT_PIN = "1234"; // ← change this default, or use "Changer le code" once unlocked
 const PIN_KEY = "sf_pin";
 const UNLOCKED_KEY = "sf_unlocked";
 
-function LockScreen({ onUnlock, pinExists }) {
+function LockScreen({ onUnlock }) {
   const [input, setInput] = useState("");
   const [error, setError] = useState(false);
-  const [mode, setMode] = useState(pinExists ? "enter" : "setup"); // "setup" | "confirm" | "enter"
-  const [firstPin, setFirstPin] = useState("");
 
   function press(d) {
     if (input.length >= 4) return;
     setError(false);
     const next = input + d;
     setInput(next);
-    if (next.length === 4) {
-      setTimeout(() => handleComplete(next), 150);
-    }
+    if (next.length === 4) setTimeout(() => handleComplete(next), 150);
   }
   function del() { setInput(i => i.slice(0, -1)); setError(false); }
 
   function handleComplete(code) {
-    if (mode === "setup") {
-      setFirstPin(code);
-      setInput("");
-      setMode("confirm");
-      return;
-    }
-    if (mode === "confirm") {
-      if (code === firstPin) {
-        save(PIN_KEY, code);
-        save(UNLOCKED_KEY, true);
-        onUnlock();
-      } else {
-        setError(true);
-        setInput("");
-        setTimeout(() => { setMode("setup"); setFirstPin(""); setError(false); }, 700);
-      }
-      return;
-    }
-    // mode === "enter"
     const stored = load(PIN_KEY, DEFAULT_PIN);
     if (code === stored) {
       save(UNLOCKED_KEY, true);
@@ -139,14 +119,11 @@ function LockScreen({ onUnlock, pinExists }) {
     }
   }
 
-  const title = mode === "setup" ? "Créer un code" : mode === "confirm" ? "Confirmer le code" : "Code requis";
-  const subtitle = mode === "setup" ? "Choisis un code à 4 chiffres" : mode === "confirm" ? "Retape le même code" : "Entre ton code pour continuer";
-
   return (
     <div style={{position:"fixed",inset:0,background:"#020303",zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'SF Pro Display',-apple-system,sans-serif"}}>
       <div style={{width:64,height:64,borderRadius:18,background:"linear-gradient(135deg,#B4FF00,#5FD34A)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,fontWeight:900,color:"#020303",marginBottom:24}}>SF</div>
-      <div style={{fontSize:19,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{title}</div>
-      <div style={{fontSize:13,color:"#3A6040",marginBottom:32}}>{subtitle}</div>
+      <div style={{fontSize:19,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>Code requis</div>
+      <div style={{fontSize:13,color:"#3A6040",marginBottom:32}}>Entre le code d'accès pour continuer</div>
 
       <div style={{display:"flex",gap:14,marginBottom:40}}>
         {[0,1,2,3].map(i=>(
@@ -174,13 +151,6 @@ function LockScreen({ onUnlock, pinExists }) {
           );
         })}
       </div>
-
-      {mode==="enter" && (
-        <button onClick={()=>{ if(window.confirm("Réinitialiser le code ? Tu devras en créer un nouveau.")){ localStorage.removeItem(PIN_KEY); setMode("setup"); setInput(""); } }}
-          style={{marginTop:32,background:"none",border:"none",color:"#3A6040",fontSize:12,cursor:"pointer",textDecoration:"underline"}}>
-          Code oublié ?
-        </button>
-      )}
     </div>
   );
 }
@@ -920,7 +890,7 @@ export default function App() {
 
   // ── LOCK GATE — show PIN screen until unlocked on this device ──────────────
   if (!unlocked) {
-    return <LockScreen pinExists={!!load(PIN_KEY, null)} onUnlock={()=>setUnlocked(true)}/>;
+    return <LockScreen onUnlock={()=>setUnlocked(true)}/>;
   }
 
   return (
