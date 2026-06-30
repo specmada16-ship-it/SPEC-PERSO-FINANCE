@@ -356,6 +356,12 @@ export default function App() {
   const [newScEnv,setNSE]      = useState("");
   const [editingEnv,setEEv]    = useState(null);
   const [editingLabel,setEL]   = useState("");
+  const [editingProfile,setEP] = useState(null);
+  const [editingPName,setEPN]  = useState("");
+  const [editingSubcat,setESC] = useState(null);
+  const [editingSubLabel,setESL] = useState("");
+  const [editingIR,setEIR]     = useState(null);
+  const [editingIRLabel,setEIRL] = useState("");
   const [editingColor,setEC]   = useState(null); // id of env being color-edited
   const [showReset,setShowReset] = useState(false);
   const [importMsg,setImportMsg] = useState("");
@@ -534,6 +540,11 @@ export default function App() {
     const remaining = profiles.filter(p=>p.id!==id);
     setProfiles(remaining);
     if(activeId===id) switchProfile(remaining[0].id);
+  }
+
+  function renameProfile(id, newName) {
+    if(!newName.trim()) return;
+    setProfiles(ps => ps.map(p => p.id===id ? {...p, name:newName.trim()} : p));
   }
 
   // Calculate disponible from all non-system envelopes, defaulting missing keys to 0
@@ -769,10 +780,26 @@ export default function App() {
                     <span style={{fontSize:16,fontWeight:800,color:activeId===p.id?"#020303":"#B4FF00"}}>{p.name[0].toUpperCase()}</span>
                   </div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:15,fontWeight:700,color:activeId===p.id?"#B4FF00":T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                    {editingProfile===p.id?(
+                      <input value={editingPName} onChange={e=>setEPN(e.target.value)}
+                        onClick={e=>e.stopPropagation()}
+                        onBlur={()=>{ renameProfile(p.id, editingPName); setEP(null); }}
+                        onKeyDown={e=>{ if(e.key==="Enter") e.target.blur(); }}
+                        autoFocus
+                        style={{width:"100%",padding:"3px 6px",borderRadius:6,border:`1px solid #B4FF0060`,background:"#040806",color:T.text,fontSize:15,fontWeight:700,outline:"none",boxSizing:"border-box"}}/>
+                    ):(
+                      <div style={{fontSize:15,fontWeight:700,color:activeId===p.id?"#B4FF00":T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                    )}
                     <div style={{fontSize:11,color:T.sub}}>{activeId===p.id?"Actif":"Appuyer pour switcher"}</div>
                   </div>
                   {activeId===p.id&&<span style={{color:"#B4FF00",fontSize:18,flexShrink:0}}>✓</span>}
+
+                  {/* Rename icon */}
+                  <button onClick={e=>{e.stopPropagation(); setEP(p.id); setEPN(p.name);}} title="Renommer" style={{background:"none",border:"none",color:T.sub,cursor:"pointer",padding:6,flexShrink:0,display:"flex"}}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
 
                   {/* Export icon */}
                   <button onClick={e=>{e.stopPropagation();exportProfileById(p.id,p.name);}} title="Exporter" style={{background:"none",border:"none",color:T.sub,cursor:"pointer",padding:6,flexShrink:0,display:"flex"}}>
@@ -825,18 +852,6 @@ export default function App() {
                 <span style={{fontSize:11,color:T.sub}}>▾</span>
               </button>
               <div style={{fontSize:11,color:T.sub,letterSpacing:1}}>{profiles.length} profil{profiles.length>1?"s":""}</div>
-            </div>
-
-            {/* SW DEBUG BADGE — temporary diagnostic */}
-            <div onClick={()=>alert(JSON.stringify(swDebug,null,2))} style={{
-              display:"inline-flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:20,marginBottom:12,cursor:"pointer",
-              background: swStatus==="active" ? "#0D2D1E" : swStatus==="checking" ? "#141005" : "#3B1A1A",
-              border:`1px solid ${swStatus==="active"?"#34D39960":swStatus==="checking"?"#FBBF2460":"#F8717160"}`,
-            }}>
-              <span style={{width:6,height:6,borderRadius:"50%",background:swStatus==="active"?"#34D399":swStatus==="checking"?"#FBBF24":"#F87171"}}/>
-              <span style={{fontSize:10,fontWeight:700,color:swStatus==="active"?"#34D399":swStatus==="checking"?"#FBBF24":"#F87171"}}>
-                SW: {swStatus}
-              </span>
             </div>
 
             <div style={{fontSize:11,color:T.sub,letterSpacing:2,fontWeight:700,marginBottom:6}}>SOLDE DISPONIBLE</div>
@@ -1223,7 +1238,15 @@ export default function App() {
                         {scs.map((sc,i)=>(
                           <div key={sc.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:i<scs.length-1?`1px solid ${T.border}`:undefined}}>
                             <span style={{width:8,height:8,borderRadius:"50%",background:env.color,flexShrink:0}}/>
-                            <div style={{flex:1,fontSize:14,color:T.text}}>{sc.label}</div>
+                            {editingSubcat===sc.id?(
+                              <input value={editingSubLabel} onChange={e=>setESL(e.target.value)}
+                                onBlur={()=>{ if(editingSubLabel.trim()) setSub(subcats.map(x=>x.id===sc.id?{...x,label:editingSubLabel.trim()}:x)); setESC(null); }}
+                                onKeyDown={e=>{ if(e.key==="Enter") e.target.blur(); }}
+                                autoFocus
+                                style={{flex:1,padding:"3px 6px",borderRadius:6,border:`1px solid ${env.color}60`,background:"#040806",color:T.text,fontSize:14,outline:"none"}}/>
+                            ):(
+                              <div onClick={()=>{ setESC(sc.id); setESL(sc.label); }} style={{flex:1,fontSize:14,color:T.text,cursor:"pointer"}}>{sc.label}</div>
+                            )}
                             <button onClick={()=>setSub(subcats.filter(x=>x.id!==sc.id))} style={{background:"none",border:"none",cursor:"pointer",color:"#F87171",fontSize:18,padding:"0 4px"}}>×</button>
                           </div>
                         ))}
@@ -1245,9 +1268,17 @@ export default function App() {
                 {Object.entries(incomeRules).map(([k,r])=>(
                   <div key={k} style={{marginBottom:16}}>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
                         <span style={{fontSize:18}}>{r.icon}</span>
-                        <span style={{fontSize:14,fontWeight:700,color:T.text}}>{r.label}</span>
+                        {editingIR===k?(
+                          <input value={editingIRLabel} onChange={e=>setEIRL(e.target.value)}
+                            onBlur={()=>{ if(editingIRLabel.trim()) setIR(rules=>({...rules,[k]:{...rules[k],label:editingIRLabel.trim()}})); setEIR(null); }}
+                            onKeyDown={e=>{ if(e.key==="Enter") e.target.blur(); }}
+                            autoFocus
+                            style={{flex:1,padding:"3px 6px",borderRadius:6,border:`1px solid ${r.color}60`,background:"#040806",color:T.text,fontSize:14,fontWeight:700,outline:"none"}}/>
+                        ):(
+                          <span onClick={()=>{ setEIR(k); setEIRL(r.label); }} style={{fontSize:14,fontWeight:700,color:T.text,cursor:"pointer"}}>{r.label}</span>
+                        )}
                       </div>
                       {Object.keys(incomeRules).length>1&&(
                         <button onClick={()=>setIR(rules=>{ const n={...rules}; delete n[k]; return n; })} style={{background:"none",border:"none",color:"#F87171",fontSize:18,cursor:"pointer",padding:"0 4px"}}>×</button>
