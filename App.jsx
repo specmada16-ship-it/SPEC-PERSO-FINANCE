@@ -87,6 +87,176 @@ const uid  = () => Math.random().toString(36).slice(2,8);
 const load = (k,d) => { try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch{ return d; } };
 const save = (k,v) => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} };
 
+// ─── PIN LOCK ─────────────────────────────────────────────────────────────────
+const DEFAULT_PIN = "0000"; // changed on first setup
+const PIN_KEY = "sf_pin";
+const UNLOCKED_KEY = "sf_unlocked";
+
+function LockScreen({ onUnlock, pinExists }) {
+  const [input, setInput] = useState("");
+  const [error, setError] = useState(false);
+  const [mode, setMode] = useState(pinExists ? "enter" : "setup"); // "setup" | "confirm" | "enter"
+  const [firstPin, setFirstPin] = useState("");
+
+  function press(d) {
+    if (input.length >= 4) return;
+    setError(false);
+    const next = input + d;
+    setInput(next);
+    if (next.length === 4) {
+      setTimeout(() => handleComplete(next), 150);
+    }
+  }
+  function del() { setInput(i => i.slice(0, -1)); setError(false); }
+
+  function handleComplete(code) {
+    if (mode === "setup") {
+      setFirstPin(code);
+      setInput("");
+      setMode("confirm");
+      return;
+    }
+    if (mode === "confirm") {
+      if (code === firstPin) {
+        save(PIN_KEY, code);
+        save(UNLOCKED_KEY, true);
+        onUnlock();
+      } else {
+        setError(true);
+        setInput("");
+        setTimeout(() => { setMode("setup"); setFirstPin(""); setError(false); }, 700);
+      }
+      return;
+    }
+    // mode === "enter"
+    const stored = load(PIN_KEY, DEFAULT_PIN);
+    if (code === stored) {
+      save(UNLOCKED_KEY, true);
+      onUnlock();
+    } else {
+      setError(true);
+      setTimeout(() => { setInput(""); setError(false); }, 500);
+    }
+  }
+
+  const title = mode === "setup" ? "Créer un code" : mode === "confirm" ? "Confirmer le code" : "Code requis";
+  const subtitle = mode === "setup" ? "Choisis un code à 4 chiffres" : mode === "confirm" ? "Retape le même code" : "Entre ton code pour continuer";
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"#020303",zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'SF Pro Display',-apple-system,sans-serif"}}>
+      <div style={{width:64,height:64,borderRadius:18,background:"linear-gradient(135deg,#B4FF00,#5FD34A)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,fontWeight:900,color:"#020303",marginBottom:24}}>SF</div>
+      <div style={{fontSize:19,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{title}</div>
+      <div style={{fontSize:13,color:"#3A6040",marginBottom:32}}>{subtitle}</div>
+
+      <div style={{display:"flex",gap:14,marginBottom:40}}>
+        {[0,1,2,3].map(i=>(
+          <div key={i} style={{
+            width:16,height:16,borderRadius:"50%",
+            background: i<input.length ? (error?"#F87171":"#B4FF00") : "transparent",
+            border:`2px solid ${error?"#F87171":i<input.length?"#B4FF00":"#1E3D22"}`,
+            transition:"all .15s",
+          }}/>
+        ))}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:18,width:260}}>
+        {["1","2","3","4","5","6","7","8","9","","0","del"].map((k,i)=>{
+          if (k === "") return <div key={i}/>;
+          if (k === "del") return (
+            <button key={i} onClick={del} style={{height:64,borderRadius:"50%",border:"none",background:"none",color:"#E8FFD4",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E8FFD4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>
+              </svg>
+            </button>
+          );
+          return (
+            <button key={i} onClick={()=>press(k)} style={{height:64,width:64,borderRadius:"50%",border:"1px solid #122416",background:"#060E08",color:"#E8FFD4",fontSize:24,fontWeight:600,cursor:"pointer"}}>{k}</button>
+          );
+        })}
+      </div>
+
+      {mode==="enter" && (
+        <button onClick={()=>{ if(window.confirm("Réinitialiser le code ? Tu devras en créer un nouveau.")){ localStorage.removeItem(PIN_KEY); setMode("setup"); setInput(""); } }}
+          style={{marginTop:32,background:"none",border:"none",color:"#3A6040",fontSize:12,cursor:"pointer",textDecoration:"underline"}}>
+          Code oublié ?
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ChangePinScreen({ onClose }) {
+  const [step, setStep] = useState("current"); // "current" | "new" | "confirm" | "done"
+  const [input, setInput] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [error, setError] = useState(false);
+
+  function press(d) {
+    if (input.length >= 4) return;
+    setError(false);
+    const next = input + d;
+    setInput(next);
+    if (next.length === 4) setTimeout(() => handleComplete(next), 150);
+  }
+  function del() { setInput(i => i.slice(0, -1)); setError(false); }
+
+  function handleComplete(code) {
+    const stored = load(PIN_KEY, DEFAULT_PIN);
+    if (step === "current") {
+      if (code === stored) { setInput(""); setStep("new"); }
+      else { setError(true); setTimeout(()=>{ setInput(""); setError(false); }, 500); }
+      return;
+    }
+    if (step === "new") {
+      setNewPin(code);
+      setInput("");
+      setStep("confirm");
+      return;
+    }
+    if (step === "confirm") {
+      if (code === newPin) {
+        save(PIN_KEY, code);
+        setStep("done");
+        setTimeout(onClose, 1000);
+      } else {
+        setError(true);
+        setTimeout(()=>{ setInput(""); setStep("new"); setNewPin(""); setError(false); }, 700);
+      }
+    }
+  }
+
+  const titles = { current:"Code actuel", new:"Nouveau code", confirm:"Confirmer", done:"✓ Code mis à jour" };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",padding:24,fontFamily:"'SF Pro Display',-apple-system,sans-serif"}}>
+      <button onClick={onClose} style={{position:"absolute",top:24,right:24,background:"none",border:"none",color:"#3A6040",fontSize:24,cursor:"pointer"}}>×</button>
+      <div style={{fontSize:19,fontWeight:800,color:"#E8FFD4",marginBottom:32}}>{titles[step]}</div>
+      {step!=="done" && (
+        <>
+          <div style={{display:"flex",gap:14,marginBottom:40}}>
+            {[0,1,2,3].map(i=>(
+              <div key={i} style={{width:16,height:16,borderRadius:"50%",background:i<input.length?(error?"#F87171":"#B4FF00"):"transparent",border:`2px solid ${error?"#F87171":i<input.length?"#B4FF00":"#1E3D22"}`}}/>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:18,width:260}}>
+            {["1","2","3","4","5","6","7","8","9","","0","del"].map((k,i)=>{
+              if (k === "") return <div key={i}/>;
+              if (k === "del") return (
+                <button key={i} onClick={del} style={{height:64,borderRadius:"50%",border:"none",background:"none",color:"#E8FFD4",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8FFD4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>
+                  </svg>
+                </button>
+              );
+              return <button key={i} onClick={()=>press(k)} style={{height:64,width:64,borderRadius:"50%",border:"1px solid #122416",background:"#060E08",color:"#E8FFD4",fontSize:24,fontWeight:600,cursor:"pointer"}}>{k}</button>;
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── PROFILE UTILS ────────────────────────────────────────────────────────────
 const pload = (pid,k,d) => load(`p_${pid}_${k}`,d);
 const psave = (pid,k,v) => save(`p_${pid}_${k}`,v);
@@ -197,10 +367,25 @@ function TxRow({ tx, onDelete, subcats, envelopes, incomeRules, last }) {
 
 // ─── SPLIT EDITOR ─────────────────────────────────────────────────────────────
 function SplitEditor({ ruleKey, rule, envelopes, setIncomeRules }) {
-  const [splits,setSplits]=useState({...rule.split});
+  const envIds = envelopes.map(e=>e.id);
+  // Purge any keys from rule.split that no longer correspond to an existing envelope
+  const cleanSplit = Object.fromEntries(envIds.map(id => [id, rule.split[id] ?? 0]));
+  const [splits,setSplits]=useState(cleanSplit);
+
+  // Re-sync if envelopes change (e.g. one was deleted) — drop orphaned keys, keep valid ones
+  useEffect(() => {
+    setSplits(prev => Object.fromEntries(envIds.map(id => [id, prev[id] ?? rule.split[id] ?? 0])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [envIds.join(",")]);
+
   const total=Object.values(splits).reduce((a,v)=>a+(parseFloat(v)||0),0);
   const valid=Math.round(total)===100;
-  function apply(){ if(!valid) return; setIncomeRules(r=>({...r,[ruleKey]:{...r[ruleKey],split:Object.fromEntries(Object.entries(splits).map(([k,v])=>[k,parseFloat(v)||0]))}})); }
+  function apply(){
+    if(!valid) return;
+    // Only keep keys for envelopes that currently exist
+    const purged = Object.fromEntries(envIds.map(id=>[id, parseFloat(splits[id])||0]));
+    setIncomeRules(r=>({...r,[ruleKey]:{...r[ruleKey],split:purged}}));
+  }
   return (
     <div style={{background:"#060E08",borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`,marginBottom:8}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
@@ -286,6 +471,9 @@ function SinkingCard({ fund, onDelete, onAdd, tresorerie, totalAlloue }) {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function App() {
   const isDesktop = useIsDesktop();
+  const [unlocked, setUnlocked] = useState(() => load(UNLOCKED_KEY, false));
+  const [showChangePin, setShowChangePin] = useState(false);
+
   const [swStatus, setSwStatus] = useState("checking");
   const [swDebug, setSwDebug] = useState(null);
 
@@ -342,6 +530,15 @@ export default function App() {
   const [addMode,setAddMode]   = useState("expense");
   const [amount,setAmount]     = useState("");
   const [incomeType,setIT]     = useState("prestation");
+
+  // Keep incomeType pointing to a valid, existing income rule at all times.
+  // Prevents crash when the previously selected type was deleted.
+  useEffect(() => {
+    if (!incomeRules[incomeType]) {
+      const firstKey = Object.keys(incomeRules)[0];
+      if (firstKey) setIT(firstKey);
+    }
+  }, [incomeRules, incomeType]);
   const [subcatId,setScId]     = useState(DEFAULT_SUBCATS[0].id);
   const [label,setLabel]       = useState("");
   const [note,setNote]         = useState("");
@@ -563,6 +760,7 @@ export default function App() {
     const nb={...bal}, nm={...envMax};
     if(addMode==="income"){
       const rule=incomeRules[incomeType];
+      if(!rule) return; // safety: no valid income type selected, abort silently
       Object.entries(rule.split).forEach(([k,p])=>{
         if(p){
           nb[k]=(nb[k]||0)+amt*p/100;
@@ -696,10 +894,11 @@ export default function App() {
   function SplitPreview() {
     if(!amt) return null;
     const rule=incomeRules[incomeType];
+    if(!rule) return null;
     return (
       <div style={{background:T.card2,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`}}>
         <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>RÉPARTITION AUTOMATIQUE</div>
-        {Object.entries(rule.split).map(([key,pct])=>{
+        {Object.entries(rule.split||{}).map(([key,pct])=>{
           if(!pct) return null;
           const env=envelopes.find(e=>e.id===key); if(!env) return null;
           return (
@@ -718,6 +917,11 @@ export default function App() {
 
   // Subcats filtered by selected envelope for history
   const filteredSubcats = hEnv==="all" ? subcats : subcats.filter(s=>s.envelopeId===hEnv);
+
+  // ── LOCK GATE — show PIN screen until unlocked on this device ──────────────
+  if (!unlocked) {
+    return <LockScreen pinExists={!!load(PIN_KEY, null)} onUnlock={()=>setUnlocked(true)}/>;
+  }
 
   return (
     <div style={{fontFamily:"'SF Pro Display','Space Grotesk',-apple-system,sans-serif",background:T.bg,minHeight:"100vh",color:T.text,display:"flex"}}>
@@ -836,6 +1040,27 @@ export default function App() {
               </div>
             </div>
           </div>
+
+          {/* Bottom-right lock controls */}
+          <div style={{position:"absolute",bottom:20,right:20,display:"flex",gap:8}}>
+            <button onClick={()=>setShowChangePin(true)} title="Changer le code" style={{width:40,height:40,borderRadius:12,border:`1px solid #B4FF0060`,background:"#0B1A1240",color:"#B4FF00",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="16" r="1"/><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+              </svg>
+            </button>
+            <button onClick={()=>{ save(UNLOCKED_KEY,false); setUnlocked(false); }} title="Verrouiller" style={{width:40,height:40,borderRadius:12,border:`1px solid ${T.border}`,background:"#040806",color:T.sub,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+              </svg>
+            </button>
+          </div>
+
+          {/* Change PIN modal */}
+          {showChangePin && (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:300}}>
+              <ChangePinScreen onClose={()=>setShowChangePin(false)}/>
+            </div>
+          )}
         </div>
       )}
 
@@ -1189,7 +1414,20 @@ export default function App() {
                         )}
                         {env.system
                           ? <span style={{fontSize:11,color:T.sub,padding:"0 4px",fontWeight:600}}>🔒</span>
-                          : <button onClick={()=>{ if(envelopes.length<=1) return; safeSetEnv(envelopes.filter(x=>x.id!==env.id)); setSub(subcats.filter(s=>s.envelopeId!==env.id)); }} style={{background:"none",border:"none",cursor:"pointer",color:"#F87171",fontSize:18,padding:"0 4px"}}>×</button>
+                          : <button onClick={()=>{
+                              if(envelopes.length<=1) return;
+                              const delId = env.id;
+                              safeSetEnv(envelopes.filter(x=>x.id!==delId));
+                              setSub(subcats.filter(s=>s.envelopeId!==delId));
+                              // Purge this envelope's percentage from ALL income rules' splits
+                              setIR(rules => Object.fromEntries(Object.entries(rules).map(([k,r]) => {
+                                const { [delId]:_, ...rest } = r.split;
+                                return [k, { ...r, split: rest }];
+                              })));
+                              // Clean up balances and max tracking for the deleted envelope
+                              setBal(b => { const { [delId]:_, ...rest } = b; return rest; });
+                              setEnvMax(m => { const { [delId]:_, ...rest } = m; return rest; });
+                            }} style={{background:"none",border:"none",cursor:"pointer",color:"#F87171",fontSize:18,padding:"0 4px"}}>×</button>
                         }
                       </div>
                       {/* Color picker inline */}
@@ -1199,13 +1437,13 @@ export default function App() {
                           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
                             {["#F87171","#FBBF24","#34D399","#B4FF00","#60A5FA","#A78BFA","#F472B6","#FB923C","#94A3B8","#E2E8F0","#818CF8","#2DD4BF"].map(c=>(
                               <button key={c} onClick={()=>{
-                                safeSetEnv(envelopes.map(x=>x.id===env.id?{...x,color:c,bg:c+"22"}:x));
+                                safeSetEnv(prev=>prev.map(x=>x.id===env.id?{...x,color:c,bg:c+"22"}:x));
                               }} style={{width:28,height:28,borderRadius:"50%",background:c,border:env.color===c?`3px solid ${T.text}`:"3px solid transparent",cursor:"pointer",flexShrink:0}}/>
                             ))}
                             {/* Custom color */}
                             <div style={{position:"relative",width:28,height:28}}>
                               <input type="color" value={env.color}
-                                onChange={e=>safeSetEnv(envelopes.map(x=>x.id===env.id?{...x,color:e.target.value,bg:e.target.value+"22"}:x))}
+                                onChange={e=>{ const val=e.target.value; safeSetEnv(prev=>prev.map(x=>x.id===env.id?{...x,color:val,bg:val+"22"}:x)); }}
                                 style={{width:"100%",height:"100%",borderRadius:"50%",border:"none",cursor:"pointer",padding:0,background:"none"}}/>
                             </div>
                           </div>
