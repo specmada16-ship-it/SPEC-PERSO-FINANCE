@@ -21,9 +21,18 @@
   <script type="module" src="/main.jsx"></script>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/sw.js");
-      });
+      navigator.serviceWorker.register("/sw.js").then(reg => {
+        // Force immediate activation, don't wait for next visit
+        if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        reg.addEventListener("updatefound", () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener("statechange", () => {
+            if (newWorker.state === "activated") {
+              console.log("SW activated and ready for offline use");
+            }
+          });
+        });
+      }).catch(err => console.error("SW registration failed:", err));
     }
   </script>
 </body>

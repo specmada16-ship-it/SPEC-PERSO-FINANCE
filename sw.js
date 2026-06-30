@@ -1,7 +1,26 @@
-const CACHE = "spec-finance-v2";
+const CACHE = "spec-finance-v3";
+const CORE_ASSETS = [
+  "/",
+  "/index.html",
+  "/manifest.json",
+  "/icon-192.png",
+  "/icon-512.png",
+];
 
 self.addEventListener("install", e => {
+  e.waitUntil(
+    caches.open(CACHE).then(cache =>
+      cache.addAll(CORE_ASSETS).catch(err => {
+        // Don't fail install if one asset is missing, log and continue
+        console.warn("Some core assets failed to cache:", err);
+      })
+    )
+  );
   self.skipWaiting();
+});
+
+self.addEventListener("message", e => {
+  if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", e => {
@@ -13,8 +32,7 @@ self.addEventListener("activate", e => {
   self.clients.claim();
 });
 
-// Cache-first for same-origin GET requests, falling back to network,
-// and caching whatever successfully loads (JS, CSS, HTML, icons, manifest...)
+// Cache-first for same-origin GET requests, caching everything that loads successfully
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
@@ -22,8 +40,9 @@ self.addEventListener("fetch", e => {
 
   e.respondWith(
     caches.open(CACHE).then(async cache => {
-      const cached = await cache.match(e.request);
+      const cached = await cache.match(e.request, { ignoreSearch: true });
       if (cached) {
+        // Serve cached immediately, refresh in background if online
         fetch(e.request).then(res => {
           if (res && res.ok) cache.put(e.request, res.clone());
         }).catch(() => {});
@@ -38,7 +57,7 @@ self.addEventListener("fetch", e => {
           const fallback = await cache.match("/index.html") || await cache.match("/");
           if (fallback) return fallback;
         }
-        throw err;
+        return new Response("Offline — contenu non disponible", { status: 503 });
       }
     })
   );
