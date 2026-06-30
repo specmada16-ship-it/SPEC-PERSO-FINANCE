@@ -1,5 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
 
+// ─── RESPONSIVE HOOK ──────────────────────────────────────────────────────────
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 900 : false
+  );
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= 900);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isDesktop;
+}
+
 const T = { bg:"#020303", card:"#060E08", card2:"#0A1A0C", border:"#122416", text:"#E8FFD4", accent:"#B4FF00", accentD:"#A6FF1A", green:"#5FD34A", sub:"#3A6040", muted:"#080F09" };
 const CURRENCY = "Ar";
 const SEUILS = { alerte:20000, blocage:8000 };
@@ -40,6 +53,32 @@ const DEFAULT_INCOME_RULES = {
 const RECUR_OPTIONS = [
   { id:"none",label:"Aucun" },{ id:"weekly",label:"Chaque semaine" },
   { id:"monthly",label:"Chaque mois" },{ id:"yearly",label:"Chaque année" },
+];
+
+// ─── SHARED NAV ITEMS (used by both mobile bottom nav and desktop sidebar) ────
+const NAV_ITEMS = [
+  {id:"home", label:"Accueil", svg:(c)=>(
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+      <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+    </svg>
+  )},
+  {id:"history", label:"Historique", svg:(c)=>(
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/>
+    </svg>
+  )},
+  {id:"add", label:"Ajouter", big:true},
+  {id:"recurring", label:"Récurrents", svg:(c)=>(
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/>
+    </svg>
+  )},
+  {id:"categories", label:"Catégories", svg:(c)=>(
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h16M4 12h10M4 18h6"/>
+    </svg>
+  )},
 ];
 
 const fmt  = n => new Intl.NumberFormat("fr-FR").format(Math.round(n||0))+" "+CURRENCY;
@@ -246,6 +285,8 @@ function SinkingCard({ fund, onDelete, onAdd, tresorerie, totalAlloue }) {
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function App() {
+  const isDesktop = useIsDesktop();
+
   // ── Profile system ──────────────────────────────────────────────────────────
   const [profiles,setProfiles]  = useState(()=>load("sf_profiles",DEFAULT_PROFILES));
   const [activeId,setActiveId]  = useState(()=>load("sf_active","default"));
@@ -292,6 +333,8 @@ export default function App() {
   const [editingLabel,setEL]   = useState("");
   const [editingColor,setEC]   = useState(null); // id of env being color-edited
   const [showReset,setShowReset] = useState(false);
+  const [importMsg,setImportMsg] = useState("");
+  const [showBackup,setShowBackup] = useState(false);
   const [catTab,setCatTab]     = useState("envelopes");
 
   // History filters
@@ -379,6 +422,78 @@ export default function App() {
     setRE([]);
     setTxs([]);
     setShowReset(false);
+  }
+
+  // ── EXPORT / IMPORT — per profile backup (works for ANY profile, not just active) ──
+  function exportProfileById(profileId, profileName) {
+    const data = {
+      app: "spec-finance",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      profile: { id: profileId, name: profileName },
+      data: {
+        txs:    pload(profileId,"txs",[]),
+        bal:    pload(profileId,"bal",{survie:0,tresorerie:0,operationnel:0,differable:0}),
+        env:    pload(profileId,"env",DEFAULT_ENVELOPES),
+        sub:    pload(profileId,"sub",DEFAULT_SUBCATS),
+        ir:     pload(profileId,"ir",DEFAULT_INCOME_RULES),
+        max:    pload(profileId,"max",{}),
+        sinks:  pload(profileId,"sinks",[]),
+        re:     pload(profileId,"re",[]),
+      },
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeName = profileName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    a.href = url;
+    a.download = `spec-finance-${safeName}-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function importProfileById(profileId, file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        if (!parsed.data) { setImportMsg("Fichier invalide."); return; }
+        const d = parsed.data;
+        const TRES = { id:"tresorerie", label:"Trésorerie", color:"#B4FF00", bg:"#141005", system:true };
+        let envs = d.env || DEFAULT_ENVELOPES;
+        if (!envs.some(x=>x.id==="tresorerie")) envs = [TRES, ...envs];
+        envs = envs.map(x=>x.id==="tresorerie"?{...x,system:true}:x);
+
+        // Save directly to that profile's storage
+        psave(profileId,"txs", d.txs || []);
+        psave(profileId,"bal", d.bal || {survie:0,tresorerie:0,operationnel:0,differable:0});
+        psave(profileId,"env", envs);
+        psave(profileId,"sub", d.sub || DEFAULT_SUBCATS);
+        psave(profileId,"ir",  d.ir || DEFAULT_INCOME_RULES);
+        psave(profileId,"max", d.max || {});
+        psave(profileId,"sinks", d.sinks || []);
+        psave(profileId,"re",  d.re || []);
+
+        // If importing into the currently active profile, refresh in-memory state too
+        if (profileId === activeId) {
+          setTxs(d.txs || []);
+          setBal(d.bal || {survie:0,tresorerie:0,operationnel:0,differable:0});
+          setEnv(envs);
+          setSub(d.sub || DEFAULT_SUBCATS);
+          setIR(d.ir || DEFAULT_INCOME_RULES);
+          setEnvMax(d.max || {});
+          setSF(d.sinks || []);
+          setRE(d.re || []);
+        }
+        setImportMsg("✓ Importé avec succès.");
+        setTimeout(()=>setImportMsg(""), 3000);
+      } catch (err) {
+        setImportMsg("Erreur de lecture du fichier.");
+      }
+    };
+    reader.readAsText(file);
   }
 
   function createProfile() {
@@ -569,7 +684,46 @@ export default function App() {
   const filteredSubcats = hEnv==="all" ? subcats : subcats.filter(s=>s.envelopeId===hEnv);
 
   return (
-    <div style={{fontFamily:"'SF Pro Display','Space Grotesk',-apple-system,sans-serif",background:T.bg,minHeight:"100vh",maxWidth:430,margin:"0 auto",display:"flex",flexDirection:"column",color:T.text}}>
+    <div style={{fontFamily:"'SF Pro Display','Space Grotesk',-apple-system,sans-serif",background:T.bg,minHeight:"100vh",color:T.text,display:"flex"}}>
+
+      {/* ══ DESKTOP SIDEBAR ═══════════════════════════════════════════════════ */}
+      {isDesktop && (
+        <div style={{width:220,flexShrink:0,height:"100vh",position:"sticky",top:0,background:"#060E08",borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",padding:"28px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:32,padding:"0 8px"}}>
+            <div style={{width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,#B4FF00,#5FD34A)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:"#020303",flexShrink:0}}>SF</div>
+            <div style={{fontSize:15,fontWeight:800,color:T.text}}>Spec Finance</div>
+          </div>
+
+          {NAV_ITEMS.filter(t=>!t.big).map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{
+              display:"flex",alignItems:"center",gap:12,padding:"11px 12px",borderRadius:12,border:"none",cursor:"pointer",
+              background:tab===t.id?"#0B1A12":"transparent",color:tab===t.id?"#B4FF00":T.sub,marginBottom:4,position:"relative",
+              fontSize:14,fontWeight:tab===t.id?700:500,textAlign:"left",
+            }}>
+              {t.svg(tab===t.id?"#B4FF00":T.sub)}
+              {t.label}
+              {t.id==="recurring"&&recurExp.some(r=>r.active&&daysUntil(r.nextDate)<=3)&&(
+                <span style={{position:"absolute",top:8,right:10,width:6,height:6,borderRadius:"50%",background:"#F87171"}}/>
+              )}
+            </button>
+          ))}
+
+          <button onClick={()=>setTab("add")} style={{marginTop:16,padding:"12px 0",borderRadius:12,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#B4FF00,#5FD34A)",color:"#020303",fontSize:14,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#020303" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Ajouter
+          </button>
+
+          <div style={{flex:1}}/>
+
+          <button onClick={()=>setShowP(true)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:"#040806",cursor:"pointer",color:T.text}}>
+            <div style={{width:26,height:26,borderRadius:8,background:"#B4FF00",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#020303",flexShrink:0}}>{activeProfile.name[0].toUpperCase()}</div>
+            <span style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{activeProfile.name}</span>
+          </button>
+        </div>
+      )}
+
+      {/* ══ MAIN CONTENT AREA ═════════════════════════════════════════════════ */}
+      <div style={{flex:1,maxWidth:isDesktop?720:430,margin:isDesktop?"0 auto":"0 auto",width:"100%",display:"flex",flexDirection:"column",minHeight:"100vh"}}>
 
       {/* ══ HOME ══════════════════════════════════════════════════════════════ */}
       {/* ══ PROFILE SWITCHER OVERLAY ═════════════════════════════════════════ */}
@@ -584,17 +738,38 @@ export default function App() {
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
             {profiles.map(p=>(
-              <div key={p.id} onClick={()=>switchProfile(p.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",background:activeId===p.id?"#0A1A0C":T.card,borderRadius:14,marginBottom:10,border:`1.5px solid ${activeId===p.id?"#B4FF00":T.border}`,cursor:"pointer"}}>
-                <div style={{width:40,height:40,borderRadius:12,background:activeId===p.id?"#B4FF00":"#0F2415",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                  <span style={{fontSize:16,fontWeight:800,color:activeId===p.id?"#020303":"#B4FF00"}}>{p.name[0].toUpperCase()}</span>
+              <div key={p.id}>
+                <div onClick={()=>switchProfile(p.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",background:activeId===p.id?"#0A1A0C":T.card,borderRadius:14,marginBottom:4,border:`1.5px solid ${activeId===p.id?"#B4FF00":T.border}`,cursor:"pointer"}}>
+                  <div style={{width:40,height:40,borderRadius:12,background:activeId===p.id?"#B4FF00":"#0F2415",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                    <span style={{fontSize:16,fontWeight:800,color:activeId===p.id?"#020303":"#B4FF00"}}>{p.name[0].toUpperCase()}</span>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:15,fontWeight:700,color:activeId===p.id?"#B4FF00":T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                    <div style={{fontSize:11,color:T.sub}}>{activeId===p.id?"Actif":"Appuyer pour switcher"}</div>
+                  </div>
+                  {activeId===p.id&&<span style={{color:"#B4FF00",fontSize:18,flexShrink:0}}>✓</span>}
+
+                  {/* Export icon */}
+                  <button onClick={e=>{e.stopPropagation();exportProfileById(p.id,p.name);}} title="Exporter" style={{background:"none",border:"none",color:T.sub,cursor:"pointer",padding:6,flexShrink:0,display:"flex"}}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                  </button>
+
+                  {/* Import icon */}
+                  <label onClick={e=>e.stopPropagation()} title="Importer" style={{background:"none",border:"none",color:T.sub,cursor:"pointer",padding:6,flexShrink:0,display:"flex"}}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <input type="file" accept="application/json" style={{display:"none"}} onChange={e=>{ if(e.target.files[0]) importProfileById(p.id,e.target.files[0]); e.target.value=""; }}/>
+                  </label>
+
+                  {profiles.length>1&&activeId!==p.id&&(
+                    <button onClick={e=>{e.stopPropagation();deleteProfile(p.id);}} style={{background:"none",border:"none",color:"#F87171",fontSize:18,cursor:"pointer",padding:"0 2px",flexShrink:0}}>×</button>
+                  )}
                 </div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:15,fontWeight:700,color:activeId===p.id?"#B4FF00":T.text}}>{p.name}</div>
-                  <div style={{fontSize:11,color:T.sub}}>{activeId===p.id?"Actif":"Appuyer pour switcher"}</div>
-                </div>
-                {activeId===p.id&&<span style={{color:"#B4FF00",fontSize:18}}>✓</span>}
-                {profiles.length>1&&activeId!==p.id&&(
-                  <button onClick={e=>{e.stopPropagation();deleteProfile(p.id);}} style={{background:"none",border:"none",color:"#F87171",fontSize:18,cursor:"pointer",padding:"0 4px"}}>×</button>
+                {importMsg&&p.id===activeId&&(
+                  <div style={{fontSize:11,color:importMsg.startsWith("✓")?"#B4FF00":"#F87171",marginBottom:10,paddingLeft:4,fontWeight:600}}>{importMsg}</div>
                 )}
               </div>
             ))}
@@ -1204,32 +1379,10 @@ export default function App() {
         </div>
       )}
 
-      {/* ══ BOTTOM NAV ════════════════════════════════════════════════════════ */}
+      {/* ══ BOTTOM NAV — MOBILE ONLY ══════════════════════════════════════════ */}
+      {!isDesktop && (
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"rgba(2,3,3,0.98)",backdropFilter:"blur(24px)",borderTop:`1px solid ${T.border}`,display:"flex",paddingBottom:18,paddingTop:10,zIndex:100}}>
-        {[
-          {id:"home", label:"Accueil", svg:(c)=>(
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
-              <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
-            </svg>
-          )},
-          {id:"history", label:"Historique", svg:(c)=>(
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/>
-            </svg>
-          )},
-          {id:"add", label:"Ajouter", big:true},
-          {id:"recurring", label:"Récurrents", svg:(c)=>(
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/>
-            </svg>
-          )},
-          {id:"categories", label:"Catégories", svg:(c)=>(
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 6h16M4 12h10M4 18h6"/>
-            </svg>
-          )},
-        ].map(t=>t.big?(
+        {NAV_ITEMS.map(t=>t.big?(
           <div key="add" style={{flex:1,display:"flex",justifyContent:"center"}}>
             <button onClick={()=>setTab("add")} style={{width:50,height:50,borderRadius:16,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#B4FF00,#5FD34A)",boxShadow:"0 4px 20px #B4FF0060",display:"flex",alignItems:"center",justifyContent:"center",marginTop:-10}}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#020303" strokeWidth="2.5" strokeLinecap="round">
@@ -1246,6 +1399,8 @@ export default function App() {
             <span style={{fontSize:9,fontWeight:tab===t.id?700:400,color:tab===t.id?"#B4FF00":T.sub}}>{t.label}</span>
           </button>
         ))}
+      </div>
+      )}
       </div>
     </div>
   );
