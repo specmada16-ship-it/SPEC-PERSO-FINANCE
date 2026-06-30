@@ -2,8 +2,6 @@ const CACHE = "spec-finance-v1";
 const ASSETS = [
   "/",
   "/index.html",
-  "/assets/index.js",
-  "/assets/index.css",
 ];
 
 self.addEventListener("install", e => {
