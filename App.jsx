@@ -91,7 +91,7 @@ const save = (k,v) => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{}
 // Single shared code, defined by the app owner via "Changer le code" (inside the
 // app, after already being unlocked). New visitors only ever see "enter the code" —
 // they can never create or reset it themselves.
-const DEFAULT_PIN = "1234"; // ← change this default, or use "Changer le code" once unlocked
+const DEFAULT_PIN = "0903"; // ← change this default, or use "Changer le code" once unlocked
 const PIN_KEY = "sf_pin";
 const UNLOCKED_KEY = "sf_unlocked";
 
