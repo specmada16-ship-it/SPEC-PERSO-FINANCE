@@ -1,4 +1,4 @@
-const CACHE = "spec-finance-v3";
+const CACHE = "spec-finance-v5";
 const CORE_ASSETS = [
   "/",
   "/index.html",
