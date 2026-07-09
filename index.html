@@ -6,14 +6,17 @@
   <meta name="theme-color" content="#020303"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="apple-mobile-web-app-title" content="SpecFin"/>
+  <meta name="apple-mobile-web-app-title" content="Kajy"/>
   <link rel="manifest" href="/manifest.json"/>
   <link rel="apple-touch-icon" href="/icon-192.png"/>
-  <title>Spec Finance</title>
+  <title>Kajy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link rel="stylesheet" href="/fonts.css"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body, #root { height: 100%; background: #020303; }
-    body { overscroll-behavior: none; }
+    body { overscroll-behavior: none; font-family: 'Space Grotesk', 'Inter', -apple-system, sans-serif; }
   </style>
 </head>
 <body>
@@ -22,7 +25,6 @@
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").then(reg => {
-        // Force immediate activation, don't wait for next visit
         if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
         reg.addEventListener("updatefound", () => {
           const newWorker = reg.installing;
