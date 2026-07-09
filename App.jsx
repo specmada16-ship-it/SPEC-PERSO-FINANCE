@@ -14,8 +14,31 @@ function useIsDesktop() {
 }
 
 const T = { bg:"#020303", card:"#060E08", card2:"#0A1A0C", border:"#122416", text:"#E8FFD4", accent:"#B4FF00", accentD:"#A6FF1A", green:"#5FD34A", sub:"#3A6040", muted:"#080F09" };
-const CURRENCY = "Ar";
-const SEUILS = { alerte:20000, blocage:8000 };
+// ─── SEUILS ───────────────────────────────────────────────────────────────────
+const SEUILS_KEY = "seuils";
+const SEUILS_PRESETS = [
+  { id:"simple",  label:"Vie simple",  desc:"Peu de charges fixes — célibataire, pas de loyer, peu d'abonnements",  emoji:"🌱", alerte:35000,  blocage:15000 },
+  { id:"active",  label:"Vie active",  desc:"Charges moyennes — foyer 2 personnes, loyer, quelques abonnements",     emoji:"⚡", alerte:60000,  blocage:25000 },
+  { id:"chargee", label:"Vie chargée", desc:"Beaucoup de charges — famille, enfants, loyer + abonnements importants", emoji:"🔥", alerte:100000, blocage:50000 },
+  { id:"custom",  label:"Personnalisé", desc:"Définis tes propres seuils selon ta situation",                         emoji:"✏️", alerte:null,   blocage:null  },
+];
+// Runtime SEUILS — overridden per-profile in App component
+let SEUILS = { alerte:60000, blocage:25000 };
+
+const CURRENCIES = [
+  { code:"Ar",   label:"Ariary — Madagascar (Ar)",         symbol:"Ar" },
+  { code:"XOF",  label:"Franc CFA UEMOA — Afrique de l'Ouest (XOF)", symbol:"XOF" },
+  { code:"XAF",  label:"Franc CFA CEMAC — Afrique Centrale (XAF)",   symbol:"XAF" },
+  { code:"EUR",  label:"Euro — La Réunion / Mayotte (€)",  symbol:"€" },
+  { code:"MUR",  label:"Roupie mauricienne — Maurice (Rs)", symbol:"Rs" },
+  { code:"KMF",  label:"Franc comorien — Comores (KMF)",  symbol:"KMF" },
+  { code:"DJF",  label:"Franc djiboutien — Djibouti (Fdj)", symbol:"Fdj" },
+  { code:"SCR",  label:"Roupie seychelloise — Seychelles (SR)", symbol:"SR" },
+  { code:"USD",  label:"Dollar US ($)",                        symbol:"$" },
+];
+
+// fmt is now a closure — call makeFmt(currency) to get a formatter
+const makeFmt = (cur) => (n) => new Intl.NumberFormat("fr-FR").format(Math.round(n||0))+" "+cur;
 
 const DEFAULT_ENVELOPES = [
   { id:"survie",       label:"Survie",       color:"#F87171", bg:"#1A0808" },
@@ -81,22 +104,98 @@ const NAV_ITEMS = [
   )},
 ];
 
-const fmt  = n => new Intl.NumberFormat("fr-FR").format(Math.round(n||0))+" "+CURRENCY;
+let fmt = makeFmt("Ar"); // default, overridden per-profile at runtime
 const fmtD = iso => new Date(iso).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"});
 const uid  = () => Math.random().toString(36).slice(2,8);
 const load = (k,d) => { try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch{ return d; } };
 const save = (k,v) => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} };
 
 // ─── PIN LOCK ─────────────────────────────────────────────────────────────────
-// Single shared code, defined by the app owner via "Changer le code" (inside the
-// app, after already being unlocked). New visitors only ever see "enter the code" —
-// they can never create or reset it themselves.
-const DEFAULT_PIN = "0903"; // ← change this default, or use "Changer le code" once unlocked
+// Chaque utilisateur crée son propre code au premier lancement.
+// Aucun code par défaut — si aucun code n'est stocké, on affiche l'écran de création.
 const PIN_KEY = "sf_pin";
 const UNLOCKED_KEY = "sf_unlocked";
 
+// ─── LICENCE ──────────────────────────────────────────────────────────────────
+// Codes valides — ajoute ici les codes générés sur Gumroad après chaque vente.
+// Format libre : 8-12 caractères alphanumériques, ex: "SF-A1B2C3D4"
+// L'utilisateur entre son code une fois → débloqué définitivement sur cet appareil.
+const VALID_LICENSES = [
+  "SF-DEMO2024",   // ← code de démo / test
+  // Ajoute ici les codes Gumroad au fur et à mesure des ventes
+];
+const LICENSE_KEY = "sf_licensed";
+
+function LicenseScreen({ onUnlock }) {
+  const [input, setInput]   = useState("");
+  const [error, setError]   = useState("");
+  const [success, setSuccess] = useState(false);
+
+  function check() {
+    const code = input.trim().toUpperCase();
+    if (!code) return;
+    if (VALID_LICENSES.map(c=>c.toUpperCase()).includes(code)) {
+      save(LICENSE_KEY, true);
+      setSuccess(true);
+      setTimeout(onUnlock, 900);
+    } else {
+      setError("Code invalide. Vérifie ton email de confirmation Gumroad.");
+      setTimeout(() => setError(""), 3000);
+    }
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"#020303",zIndex:2000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28,fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif"}}>
+      <div style={{width:"100%",maxWidth:380,display:"flex",flexDirection:"column",alignItems:"center"}}>
+        <div style={{width:64,height:64,borderRadius:18,overflow:"hidden",marginBottom:28}}><img src="/icon-192.png" alt="Kajy" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>
+
+        {success ? (
+          <>
+            <div style={{fontSize:36,marginBottom:12}}>✅</div>
+            <div style={{fontSize:18,fontWeight:800,color:"#B4FF00"}}>Accès débloqué !</div>
+          </>
+        ) : (
+          <>
+            <div style={{fontSize:19,fontWeight:800,color:"#E8FFD4",marginBottom:6,textAlign:"center"}}>Bienvenue sur Kajy</div>
+            <div style={{fontSize:13,color:"#3A6040",marginBottom:8,textAlign:"center"}}>Entre ton code de licence pour accéder à l'app.</div>
+            <div style={{fontSize:12,color:"#1E3D22",marginBottom:28,textAlign:"center"}}>
+              Tu peux obtenir un code en contactant le vendeur via WhatsApp.
+            </div>
+
+            <input
+              value={input}
+              onChange={e=>setInput(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&check()}
+              placeholder="Ex : SF-A1B2C3D4"
+              autoCapitalize="characters"
+              style={{width:"100%",padding:"14px 16px",borderRadius:12,border:`1.5px solid ${error?"#F87171":"#1E3D22"}`,background:"#060E08",color:"#E8FFD4",fontSize:16,fontWeight:700,outline:"none",textAlign:"center",letterSpacing:2,marginBottom:12,boxSizing:"border-box"}}
+            />
+
+            {error && (
+              <div style={{fontSize:12,color:"#F87171",marginBottom:12,textAlign:"center"}}>{error}</div>
+            )}
+
+            <button onClick={check} style={{width:"100%",padding:"14px 0",borderRadius:12,border:"none",background:"#B4FF00",color:"#020303",fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:20}}>
+              Déverrouiller →
+            </button>
+
+            <div style={{fontSize:11,color:"#122416",textAlign:"center",lineHeight:1.6}}>
+              Code reçu après confirmation du paiement.<br/>
+              Problème ? Contacte-nous via WhatsApp.
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function LockScreen({ onUnlock }) {
+  const hasPin = !!load(PIN_KEY, null);
+  // mode: "create" (no pin yet) | "confirm" (confirming new pin) | "enter" (pin exists)
+  const [mode, setMode]   = useState(hasPin ? "enter" : "create");
   const [input, setInput] = useState("");
+  const [newPin, setNewPin] = useState("");
   const [error, setError] = useState(false);
 
   function press(d) {
@@ -109,21 +208,47 @@ function LockScreen({ onUnlock }) {
   function del() { setInput(i => i.slice(0, -1)); setError(false); }
 
   function handleComplete(code) {
-    const stored = load(PIN_KEY, DEFAULT_PIN);
-    if (code === stored) {
-      save(UNLOCKED_KEY, true);
-      onUnlock();
-    } else {
-      setError(true);
-      setTimeout(() => { setInput(""); setError(false); }, 500);
+    if (mode === "create") {
+      setNewPin(code);
+      setInput("");
+      setMode("confirm");
+      return;
+    }
+    if (mode === "confirm") {
+      if (code === newPin) {
+        save(PIN_KEY, code);
+        save(UNLOCKED_KEY, true);
+        onUnlock();
+      } else {
+        setError(true);
+        setTimeout(() => { setInput(""); setError(false); setMode("create"); setNewPin(""); }, 600);
+      }
+      return;
+    }
+    if (mode === "enter") {
+      const stored = load(PIN_KEY, null);
+      if (code === stored) {
+        save(UNLOCKED_KEY, true);
+        onUnlock();
+      } else {
+        setError(true);
+        setTimeout(() => { setInput(""); setError(false); }, 500);
+      }
     }
   }
 
+  const title = mode === "create"  ? "Crée ton code PIN"
+              : mode === "confirm" ? "Confirme ton code"
+              : "Ton code PIN";
+  const sub   = mode === "create"  ? "Ce code protège l'accès à ton app."
+              : mode === "confirm" ? "Entre à nouveau le même code."
+              : "Entre ton code pour continuer.";
+
   return (
-    <div style={{position:"fixed",inset:0,background:"#020303",zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'SF Pro Display',-apple-system,sans-serif"}}>
-      <div style={{width:64,height:64,borderRadius:18,background:"linear-gradient(135deg,#B4FF00,#5FD34A)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,fontWeight:900,color:"#020303",marginBottom:24}}>SF</div>
-      <div style={{fontSize:19,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>Code requis</div>
-      <div style={{fontSize:13,color:"#3A6040",marginBottom:32}}>Entre le code d'accès pour continuer</div>
+    <div style={{position:"fixed",inset:0,background:"#020303",zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif"}}>
+      <div style={{width:64,height:64,borderRadius:18,overflow:"hidden",marginBottom:24}}><img src="/icon-192.png" alt="Kajy" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>
+      <div style={{fontSize:19,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{title}</div>
+      <div style={{fontSize:13,color:"#3A6040",marginBottom:32}}>{sub}</div>
 
       <div style={{display:"flex",gap:14,marginBottom:40}}>
         {[0,1,2,3].map(i=>(
@@ -171,7 +296,7 @@ function ChangePinScreen({ onClose }) {
   function del() { setInput(i => i.slice(0, -1)); setError(false); }
 
   function handleComplete(code) {
-    const stored = load(PIN_KEY, DEFAULT_PIN);
+    const stored = load(PIN_KEY, null);
     if (step === "current") {
       if (code === stored) { setInput(""); setStep("new"); }
       else { setError(true); setTimeout(()=>{ setInput(""); setError(false); }, 500); }
@@ -198,7 +323,7 @@ function ChangePinScreen({ onClose }) {
   const titles = { current:"Code actuel", new:"Nouveau code", confirm:"Confirmer", done:"✓ Code mis à jour" };
 
   return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",padding:24,fontFamily:"'SF Pro Display',-apple-system,sans-serif"}}>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",padding:24,fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif"}}>
       <button onClick={onClose} style={{position:"absolute",top:24,right:24,background:"none",border:"none",color:"#3A6040",fontSize:24,cursor:"pointer"}}>×</button>
       <div style={{fontSize:19,fontWeight:800,color:"#E8FFD4",marginBottom:32}}>{titles[step]}</div>
       {step!=="done" && (
@@ -380,32 +505,37 @@ function SplitEditor({ ruleKey, rule, envelopes, setIncomeRules }) {
 }
 
 // ─── SINKING FUND CARD ────────────────────────────────────────────────────────
-function SinkingCard({ fund, onDelete, onAdd, tresorerie, totalAlloue }) {
-  const [addAmt,setAddAmt]=useState("");
-  const pct=Math.min(100,Math.round((fund.current/fund.goal)*100));
-  const remaining=fund.goal-fund.current;
-  const monthsLeft=fund.monthly>0?Math.ceil(remaining/fund.monthly):null;
-  // Disponible = trésorerie totale - déjà alloué dans tous les SF
+function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) {
+  const [addAmt,setAddAmt]     = useState("");
+  const [useModal,setUseModal] = useState(false);
+  const [useAmt,setUseAmt]     = useState(String(fund.current));
+  const [useLabel,setUseLabel] = useState(fund.label);
+  const [afterAction,setAfterAction] = useState("close"); // "close" | "reset"
+
+  const pct       = Math.min(100,Math.round((fund.current/fund.goal)*100));
+  const remaining = fund.goal - fund.current;
+  const monthsLeft= fund.monthly>0 ? Math.ceil(remaining/fund.monthly) : null;
   const sfDisponible = Math.max(0, tresorerie - totalAlloue);
-  const inputAmt = parseFloat(addAmt)||0;
-  // Validation: versement ne peut pas dépasser (sfDisponible + ce qui est déjà dans ce fund)
-  // i.e. on ne peut pas verser plus que ce qui est libre dans la trésorerie
-  const canAdd = inputAmt > 0 && inputAmt <= sfDisponible && inputAmt <= (fund.goal - fund.current);
-  const errMsg = inputAmt > sfDisponible
-    ? `Max disponible : ${fmt(sfDisponible)}`
-    : inputAmt > (fund.goal - fund.current)
-    ? `Dépasse l'objectif`
-    : null;
+  const inputAmt  = parseFloat(addAmt)||0;
+  const canAdd    = inputAmt>0 && inputAmt<=sfDisponible && inputAmt<=(fund.goal-fund.current);
+  const errMsg    = inputAmt>sfDisponible ? `Max disponible : ${fmt(sfDisponible)}`
+                  : inputAmt>(fund.goal-fund.current) ? `Dépasse l'objectif` : null;
+  const isGoalReached = pct >= 100;
 
   return (
-    <div style={{background:"#080F09",borderRadius:14,padding:"14px 16px",border:`1px solid ${T.border}`,marginBottom:10}}>
+    <div style={{background:"#080F09",borderRadius:14,padding:"14px 16px",border:`1px solid ${isGoalReached?"#B4FF0060":T.border}`,marginBottom:10,position:"relative"}}>
+
+      {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
         <div>
           <div style={{fontSize:14,fontWeight:700,color:T.text}}>{fund.icon} {fund.label}</div>
           {monthsLeft&&pct<100&&<div style={{fontSize:11,color:T.sub,marginTop:2}}>~{monthsLeft} mois restants</div>}
+          {isGoalReached&&<div style={{fontSize:11,color:"#5FD34A",marginTop:2,fontWeight:600}}>Objectif atteint 🎉</div>}
         </div>
         <button onClick={()=>onDelete(fund.id)} style={{background:"none",border:"none",color:"#F87171",cursor:"pointer",fontSize:16,padding:0}}>×</button>
       </div>
+
+      {/* Montants + barre */}
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
         <span style={{fontSize:13,fontWeight:800,color:"#B4FF00"}}>{fmt(fund.current)}</span>
         <span style={{fontSize:12,color:T.sub}}>/ {fmt(fund.goal)}</span>
@@ -413,32 +543,728 @@ function SinkingCard({ fund, onDelete, onAdd, tresorerie, totalAlloue }) {
       <div style={{height:6,background:T.muted,borderRadius:4,marginBottom:4,overflow:"hidden"}}>
         <div style={{height:"100%",width:pct+"%",background:pct>=100?"#5FD34A":"#B4FF00",borderRadius:4,transition:"width .4s"}}/>
       </div>
-      <div style={{fontSize:11,color:T.sub,marginBottom:pct<100?10:0}}>{pct}% atteint{pct>=100?" ✅":""}</div>
+      <div style={{fontSize:11,color:T.sub,marginBottom:10}}>{pct}% atteint{pct>=100?" ✅":""}</div>
+
+      {/* Versement (seulement si pas encore atteint) */}
       {pct<100&&(
         <>
           <div style={{display:"flex",gap:6,marginBottom:errMsg?4:0}}>
-            <input
-              value={addAmt}
-              onChange={e=>setAddAmt(e.target.value)}
-              type="number"
+            <input value={addAmt} onChange={e=>setAddAmt(e.target.value)} type="number"
               placeholder={sfDisponible>0?`Max ${fmt(sfDisponible)}`:"Trésorerie épuisée"}
               disabled={sfDisponible<=0}
-              style={{flex:1,padding:"7px 10px",borderRadius:9,border:`1px solid ${errMsg?"#F87171":canAdd?"#B4FF00":T.border}`,background:"#040806",color:sfDisponible>0?T.text:T.sub,fontSize:13,outline:"none"}}
-            />
-            <button
-              onClick={()=>{ if(!canAdd) return; onAdd(fund.id,inputAmt); setAddAmt(""); }}
+              style={{flex:1,padding:"7px 10px",borderRadius:9,border:`1px solid ${errMsg?"#F87171":canAdd?"#B4FF00":T.border}`,background:"#040806",color:sfDisponible>0?T.text:T.sub,fontSize:13,outline:"none"}}/>
+            <button onClick={()=>{ if(!canAdd)return; onAdd(fund.id,inputAmt); setAddAmt(""); }}
               disabled={!canAdd}
-              style={{padding:"7px 14px",borderRadius:9,border:"none",background:canAdd?"#B4FF00":T.muted,color:canAdd?"#050607":T.sub,fontSize:12,fontWeight:700,cursor:canAdd?"pointer":"not-allowed",transition:"all .15s"}}
-            >+</button>
+              style={{padding:"7px 14px",borderRadius:9,border:"none",background:canAdd?"#B4FF00":T.muted,color:canAdd?"#050607":T.sub,fontSize:12,fontWeight:700,cursor:canAdd?"pointer":"not-allowed"}}>+</button>
           </div>
           {errMsg&&<div style={{fontSize:11,color:"#F87171",marginBottom:6}}>{errMsg}</div>}
         </>
+      )}
+
+      {/* Bouton Utiliser */}
+      <button onClick={()=>{ setUseAmt(String(fund.current)); setUseLabel(fund.label); setUseModal(true); }}
+        style={{width:"100%",marginTop:pct<100?8:0,padding:"9px 0",borderRadius:10,border:`1px solid ${isGoalReached?"#5FD34A":"#1E3D22"}`,background:isGoalReached?"#0B1A0C":"none",color:isGoalReached?"#5FD34A":"#3A6040",fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+        {isGoalReached ? "🎯 Utiliser ce fond" : "Utiliser partiellement"}
+      </button>
+
+      {/* Modal Utiliser */}
+      {useModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(2,3,3,0.96)",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",padding:"0 0 32px"}}>
+          <div style={{width:"100%",maxWidth:430,background:"#060E08",borderRadius:"20px 20px 0 0",border:"1px solid #1E3D22",padding:"24px 20px 8px"}}>
+
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+              <span style={{fontSize:22}}>{fund.icon}</span>
+              <div>
+                <div style={{fontSize:16,fontWeight:800,color:"#E8FFD4"}}>Utiliser — {fund.label}</div>
+                <div style={{fontSize:12,color:"#3A6040"}}>Disponible dans ce fond : {fmt(fund.current)}</div>
+              </div>
+            </div>
+
+            {/* Label dépense */}
+            <div style={{fontSize:10,color:"#3A6040",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>LIBELLÉ DE LA DÉPENSE</div>
+            <input value={useLabel} onChange={e=>setUseLabel(e.target.value)}
+              style={{width:"100%",padding:"10px 12px",borderRadius:10,border:"1px solid #1E3D22",background:"#040806",color:"#E8FFD4",fontSize:14,outline:"none",marginBottom:14,boxSizing:"border-box"}}/>
+
+            {/* Montant */}
+            <div style={{fontSize:10,color:"#3A6040",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>MONTANT À UTILISER</div>
+            <input type="number" value={useAmt} onChange={e=>setUseAmt(e.target.value)}
+              style={{width:"100%",padding:"10px 12px",borderRadius:10,border:"1px solid #1E3D22",background:"#040806",color:"#B4FF00",fontSize:18,fontWeight:800,outline:"none",marginBottom:14,boxSizing:"border-box"}}/>
+
+            {/* Après utilisation */}
+            <div style={{fontSize:10,color:"#3A6040",fontWeight:700,letterSpacing:1.5,marginBottom:8}}>APRÈS UTILISATION</div>
+            <div style={{display:"flex",gap:8,marginBottom:20}}>
+              {[{id:"close",label:"Clôturer ce SF",desc:"Supprimer après utilisation"},{id:"reset",label:"Remettre à zéro",desc:"Recommencer l'épargne"}].map(opt=>(
+                <button key={opt.id} onClick={()=>setAfterAction(opt.id)}
+                  style={{flex:1,padding:"10px 8px",borderRadius:10,border:`1.5px solid ${afterAction===opt.id?"#B4FF00":"#122416"}`,background:afterAction===opt.id?"#0F2010":"#040806",cursor:"pointer",textAlign:"center"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:afterAction===opt.id?"#B4FF00":"#E8FFD4",marginBottom:2}}>{opt.label}</div>
+                  <div style={{fontSize:10,color:"#3A6040"}}>{opt.desc}</div>
+                </button>
+              ))}
+            </div>
+
+            <div style={{display:"flex",gap:10,paddingBottom:8}}>
+              <button onClick={()=>setUseModal(false)}
+                style={{flex:1,padding:"13px 0",borderRadius:12,border:"1px solid #122416",background:"none",color:"#3A6040",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                Annuler
+              </button>
+              <button onClick={()=>{
+                const amt2 = parseFloat(useAmt)||0;
+                if(!amt2||amt2>fund.current) return;
+                onUse(fund.id, amt2, useLabel||fund.label, afterAction);
+                setUseModal(false);
+              }}
+                style={{flex:2,padding:"13px 0",borderRadius:12,border:"none",background:"#B4FF00",color:"#020303",fontSize:14,fontWeight:800,cursor:"pointer"}}>
+                Confirmer l'utilisation
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-// ─── MAIN ─────────────────────────────────────────────────────────────────────
+// ─── TRANSLATIONS ─────────────────────────────────────────────────────────────
+const LANGS = { fr:"Français", en:"English" };
+const I18N = {
+  fr: {
+    config:"Configuration",
+    welcome:"Bienvenue 👋",
+    welcomeSub:"Configurons ton espace de gestion financière personnelle.",
+    createNew:"Créer un nouveau profil",
+    createNewSub:"Configure ton profil en quelques étapes.",
+    importExisting:"Importer un profil existant",
+    importExistingSub:"Tu as déjà un backup .json ? Restaure-le ici.",
+    importBtn:"Choisir un fichier .json",
+    importDoneLabel:"importé avec succès",
+    lang:"Langue", langSub:"Langue de l'interface.",
+    name:"Comment t'appelles-tu ?",
+    nameSub:"Ce nom identifiera ton profil de gestion.",
+    namePh:"Ex : Spec, Toky, Marie, Foyer…",
+    nameEx:"💡 Si tu gères les finances de ton foyer, tu peux mettre \"Foyer\" ou ton prénom.",
+    currency:"Ta devise",
+    currencySub:"Toutes tes transactions seront affichées dans cette devise.",
+    currencyEx:"💡 Si tu es à Madagascar, choisis Ariary. À Dakar ou Abidjan, choisis XOF.",
+    envelopes:"Tes enveloppes",
+    envelopesSub:"La Trésorerie est toujours incluse — c'est ta réserve intouchable.",
+    envelopesEx:"💡 Une enveloppe = une grande catégorie de ta vie. Ex : Survie (nourriture, loyer), Opérationnel (travail), Différable (loisirs).",
+    envelopesAdd:"Nouvelle enveloppe…",
+    subcats:"Tes sous-catégories",
+    subcatsSub:"Détaille chaque enveloppe selon tes dépenses réelles.",
+    subcatsEx:"💡 Ex : dans Survie → Repas, Transport, Eau, Électricité. Dans Opérationnel → Data, Déplacements clients.",
+    subcatsAdd:"Ajouter…",
+    revenues:"Tes types de revenus",
+    revenuesSub:"Comment répartir chaque revenu entre tes enveloppes ? Total = 100%.",
+    revenuesEx:"💡 Ex : ton loyer reçu va 60% en Survie, 30% en Trésorerie, 10% en Opérationnel. Une prestation va 50% en Trésorerie.",
+    revenuesAdd:"+ Ajouter un type de revenu",
+    back:"← Retour", next:"Continuer →", go:"C'est parti 🚀",
+    system_label:"SYSTÈME", tresorerie:"Trésorerie",
+    cancel:"Annuler", save:"Enregistrer",
+    profileSettings:"Paramètres du profil",
+    settingsLang:"Langue", settingsCurrency:"Devise",
+  },
+  en: {
+    config:"Setup",
+    welcome:"Welcome 👋",
+    welcomeSub:"Let's set up your personal finance space.",
+    createNew:"Create a new profile",
+    createNewSub:"Configure your profile in a few steps.",
+    importExisting:"Import an existing profile",
+    importExistingSub:"Already have a .json backup? Restore it here.",
+    importBtn:"Choose a .json file",
+    importDoneLabel:"imported successfully",
+    lang:"Language", langSub:"Interface language.",
+    name:"What's your name?",
+    nameSub:"This name will identify your profile.",
+    namePh:"E.g.: Alex, Marie, Household…",
+    nameEx:"💡 If you manage your household finances, you can use \"Household\" or your first name.",
+    currency:"Your currency",
+    currencySub:"All your transactions will be displayed in this currency.",
+    currencyEx:"💡 Choose the currency you use daily for your income and expenses.",
+    envelopes:"Your envelopes",
+    envelopesSub:"The Treasury is always included — it's your untouchable reserve.",
+    envelopesEx:"💡 An envelope = a major life category. E.g.: Survival (food, rent), Operations (work), Deferrable (leisure).",
+    envelopesAdd:"New envelope…",
+    subcats:"Your subcategories",
+    subcatsSub:"Break down each envelope by your real expenses.",
+    subcatsEx:"💡 E.g.: under Survival → Meals, Transport, Water, Electricity. Under Operations → Data, Client travel.",
+    subcatsAdd:"Add…",
+    revenues:"Your income types",
+    revenuesSub:"How to split each income across your envelopes? Total = 100%.",
+    revenuesEx:"💡 E.g.: regular rent income goes 60% to Survival, 30% to Treasury, 10% to Operations.",
+    revenuesAdd:"+ Add income type",
+    back:"← Back", next:"Continue →", go:"Let's go 🚀",
+    system_label:"SYSTEM", tresorerie:"Treasury",
+    cancel:"Cancel", save:"Save",
+    profileSettings:"Profile settings",
+    settingsLang:"Language", settingsCurrency:"Currency",
+  },
+};
+
+// ─── ONBOARDING ───────────────────────────────────────────────────────────────
+const OB_STEPS_CREATE = ["welcome","langue","profil","devise","enveloppes","subcats","revenus"];
+const OB_STEPS_IMPORT = ["welcome","import_confirm"];
+
+function OnboardingScreen({ onComplete, prefillName="" }) {
+  const [mode, setMode]   = useState(null); // null | "create" | "import"
+  const [step, setStep]   = useState(0);
+  const [lang, setLang]   = useState("fr");
+  const [pName, setPName] = useState(prefillName);
+  const [currency, setCur]= useState("Ar");
+  const [importedData, setImportedData] = useState(null);
+  const [importErr, setImportErr]       = useState("");
+
+  const t = I18N[lang];
+  const steps   = mode==="import" ? OB_STEPS_IMPORT : OB_STEPS_CREATE;
+  const step_id = steps[step] || "welcome";
+
+  const [envs, setEnvs] = useState([
+    { id:"survie",       label:"Survie",       color:"#F87171" },
+    { id:"operationnel", label:"Opérationnel", color:"#34D399" },
+    { id:"differable",   label:"Différable",   color:"#94A3B8" },
+  ]);
+  const [newEnvLabel, setNEL] = useState("");
+  const [newEnvColor, setNEC] = useState("#B4FF00");
+
+  const [subcatMap, setSubcatMap] = useState({
+    survie:       ["Repas","Transport","Eau","Électricité","Hygiène","Téléphone"],
+    operationnel: ["Data","Déplacement client","Matériel"],
+    differable:   ["Loisirs","Vêtements","Cadeaux"],
+  });
+  const [newScLabels, setNewScLabels] = useState({});
+
+  const allEnvIds = () => ["tresorerie",...envs.map(e=>e.id)];
+  const makeDefaultSplit = () => Object.fromEntries(allEnvIds().map(id=>[id,0]));
+  const [rules, setRules] = useState([
+    { key:"revenu1", label:"Revenu régulier", icon:"🏠", color:"#B4FF00",
+      split:{ tresorerie:30, survie:60, operationnel:10, differable:0 } },
+    { key:"revenu2", label:"Revenu variable",  icon:"💼", color:"#A78BFA",
+      split:{ tresorerie:50, survie:0,  operationnel:30, differable:20 } },
+  ]);
+
+  const allRulesValid = rules.every(r=>{
+    const tot = allEnvIds().reduce((a,id)=>a+(parseFloat(r.split[id])||0),0);
+    return Math.round(tot)===100;
+  });
+
+  const canNext = step_id==="langue"       ? true
+    : step_id==="profil"       ? pName.trim().length>0
+    : step_id==="devise"       ? true
+    : step_id==="enveloppes"   ? envs.length>0
+    : step_id==="subcats"      ? true
+    : step_id==="revenus"      ? allRulesValid
+    : step_id==="import_confirm" ? !!importedData&&pName.trim().length>0
+    : false;
+
+  function handleImportFile(file) {
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        if(!parsed.data){ setImportErr("Fichier invalide."); return; }
+        setImportedData(parsed);
+        if(parsed.profile?.name) setPName(parsed.profile.name);
+        setImportErr("");
+      } catch { setImportErr("Erreur de lecture du fichier."); }
+    };
+    reader.readAsText(file);
+  }
+
+  function finish() {
+    if(importedData) {
+      const TRES = { id:"tresorerie", label:t.tresorerie, color:"#B4FF00", bg:"#141005", system:true };
+      let envList = importedData.data.env || DEFAULT_ENVELOPES;
+      if(!envList.some(x=>x.id==="tresorerie")) envList=[TRES,...envList];
+      envList = envList.map(x=>x.id==="tresorerie"?{...x,system:true}:x);
+      onComplete({ name:pName.trim()||importedData.profile?.name||"Profil",
+        currency:importedData.data.currency||"Ar", lang,
+        envelopes:envList, incomeRules:importedData.data.ir||DEFAULT_INCOME_RULES,
+        subcats:importedData.data.sub||DEFAULT_SUBCATS, imported:importedData.data });
+      return;
+    }
+    const TRES = { id:"tresorerie", label:t.tresorerie, color:"#B4FF00", bg:"#141005", system:true };
+    const fullEnvs = [TRES,...envs.map(e=>({...e,bg:"#0A1A0C"}))];
+    const irObj = {};
+    rules.forEach(r=>{ irObj[r.key]={ label:r.label, icon:r.icon, color:r.color, split:r.split }; });
+    const subcats = [{ id:"reserve", label:"Mise en réserve", envelopeId:"tresorerie" }];
+    envs.forEach(e=>{ (subcatMap[e.id]||[]).forEach(lbl=>subcats.push({ id:uid(), label:lbl, envelopeId:e.id })); });
+    onComplete({ name:pName.trim(), currency, lang, envelopes:fullEnvs, incomeRules:irObj, subcats, imported:null });
+  }
+
+  const inp = { width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid #1E3D22",background:"#060E08",color:"#E8FFD4",fontSize:15,outline:"none",boxSizing:"border-box" };
+  const Btn = ({active,onClick,children,secondary}) => (
+    <button onClick={onClick} disabled={active===false} style={{
+      flex:1,padding:"14px 0",borderRadius:14,
+      border:secondary?"1px solid #1E3D22":"none",
+      background:secondary?"none":active===false?"#0A1A0C":"#B4FF00",
+      color:secondary?"#3A6040":active===false?"#3A6040":"#020303",
+      fontSize:15,fontWeight:800,cursor:active===false?"not-allowed":"pointer",
+    }}>{children}</button>
+  );
+  const ExBox = ({text}) => (
+    <div style={{background:"#040C06",border:"1px solid #1E3D22",borderRadius:10,padding:"10px 12px",marginBottom:18,fontSize:12,color:"#3A6040",lineHeight:1.6}}>{text}</div>
+  );
+  const dotSteps = OB_STEPS_CREATE.slice(1);
+  const dotIndex = mode==="create" ? step-1 : -1;
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"#020303",zIndex:500,overflowY:"auto",display:"flex",flexDirection:"column",alignItems:"center"}}>
+      <div style={{width:"100%",maxWidth:430,flex:1,display:"flex",flexDirection:"column"}}>
+
+        <div style={{padding:"52px 24px 20px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+          <div style={{width:52,height:52,borderRadius:14,overflow:"hidden"}}><img src="/icon-192.png" alt="Kajy" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>
+          <div style={{fontSize:11,color:"#3A6040",letterSpacing:2,fontWeight:700,textTransform:"uppercase"}}>{t.config}</div>
+          {mode==="create"&&step>0&&(
+            <div style={{display:"flex",gap:5}}>
+              {dotSteps.map((_,i)=>(
+                <div key={i} style={{width:i===dotIndex?8:6,height:i===dotIndex?8:6,borderRadius:"50%",background:i<dotIndex?"#5FD34A":i===dotIndex?"#B4FF00":"#1E3D22",transition:"all .2s"}}/>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{flex:1,padding:"20px 24px 32px"}}>
+
+          {step_id==="welcome"&&(
+            <>
+              <div style={{fontSize:24,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.welcome}</div>
+              <div style={{fontSize:13,color:"#3A6040",marginBottom:28}}>{t.welcomeSub}</div>
+
+              <button onClick={()=>{ setMode("create"); setStep(1); }}
+                style={{width:"100%",padding:"18px 20px",borderRadius:14,border:"1.5px solid #B4FF00",background:"#0B1A0C",cursor:"pointer",textAlign:"left",marginBottom:12,display:"flex",flexDirection:"column",gap:4}}>
+                <div style={{fontSize:15,fontWeight:800,color:"#B4FF00"}}>✦ {t.createNew}</div>
+                <div style={{fontSize:12,color:"#3A6040"}}>{t.createNewSub}</div>
+              </button>
+
+              <div style={{background:"#060E08",borderRadius:14,padding:"16px 20px",border:"1px solid #122416"}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#E8FFD4",marginBottom:3}}>{t.importExisting}</div>
+                <div style={{fontSize:12,color:"#3A6040",marginBottom:12}}>{t.importExistingSub}</div>
+                {importedData?(
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{flex:1,padding:"10px 14px",borderRadius:10,background:"#0F2010",border:"1px solid #B4FF0040",color:"#B4FF00",fontSize:13,fontWeight:700}}>
+                      ✓ {importedData.profile?.name||"Backup"} — {t.importDoneLabel}
+                    </div>
+                    <button onClick={()=>{ setMode("import"); setStep(1); }} style={{padding:"10px 16px",borderRadius:10,border:"none",background:"#B4FF00",color:"#020303",fontWeight:800,fontSize:13,cursor:"pointer"}}>
+                      {t.next}
+                    </button>
+                  </div>
+                ):(
+                  <label style={{display:"block",padding:"11px 0",borderRadius:12,border:"1.5px dashed #1E3D22",background:"#040806",color:"#3A6040",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
+                    {t.importBtn}
+                    <input type="file" accept="application/json" style={{display:"none"}} onChange={e=>handleImportFile(e.target.files[0])}/>
+                  </label>
+                )}
+                {importErr&&<div style={{fontSize:11,color:"#F87171",marginTop:6}}>{importErr}</div>}
+              </div>
+            </>
+          )}
+
+          {step_id==="import_confirm"&&(
+            <>
+              <div style={{fontSize:22,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.name}</div>
+              <div style={{fontSize:13,color:"#3A6040",marginBottom:12}}>{t.nameSub}</div>
+              <ExBox text={t.nameEx}/>
+              <input style={inp} value={pName} onChange={e=>setPName(e.target.value)} placeholder={t.namePh} autoFocus
+                onKeyDown={e=>e.key==="Enter"&&canNext&&finish()}/>
+              {importedData&&<div style={{fontSize:12,color:"#5FD34A",marginTop:10,fontWeight:600}}>✓ Données depuis "{importedData.profile?.name||"backup"}" prêtes</div>}
+            </>
+          )}
+
+          {step_id==="langue"&&(
+            <>
+              <div style={{fontSize:22,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.lang}</div>
+              <div style={{fontSize:13,color:"#3A6040",marginBottom:20}}>{t.langSub}</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {Object.entries(LANGS).map(([code,label])=>(
+                  <button key={code} onClick={()=>setLang(code)} style={{padding:"14px 16px",borderRadius:12,border:`1.5px solid ${lang===code?"#B4FF00":"#122416"}`,background:lang===code?"#0F2010":"#060E08",color:lang===code?"#B4FF00":"#E8FFD4",fontSize:15,fontWeight:lang===code?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    {label}{lang===code&&<span style={{color:"#B4FF00"}}>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {step_id==="profil"&&(
+            <>
+              <div style={{fontSize:22,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.name}</div>
+              <div style={{fontSize:13,color:"#3A6040",marginBottom:12}}>{t.nameSub}</div>
+              <ExBox text={t.nameEx}/>
+              <input style={inp} value={pName} onChange={e=>setPName(e.target.value)} placeholder={t.namePh} autoFocus
+                onKeyDown={e=>e.key==="Enter"&&canNext&&setStep(s=>s+1)}/>
+            </>
+          )}
+
+          {step_id==="devise"&&(
+            <>
+              <div style={{fontSize:22,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.currency}</div>
+              <div style={{fontSize:13,color:"#3A6040",marginBottom:12}}>{t.currencySub}</div>
+              <ExBox text={t.currencyEx}/>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {CURRENCIES.map(c=>(
+                  <button key={c.code} onClick={()=>setCur(c.code)} style={{padding:"13px 16px",borderRadius:12,border:`1.5px solid ${currency===c.code?"#B4FF00":"#122416"}`,background:currency===c.code?"#0F2010":"#060E08",color:currency===c.code?"#B4FF00":"#E8FFD4",fontSize:13,fontWeight:currency===c.code?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    {c.label}{currency===c.code&&<span style={{color:"#B4FF00"}}>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {step_id==="enveloppes"&&(
+            <>
+              <div style={{fontSize:22,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.envelopes}</div>
+              <div style={{fontSize:13,color:"#3A6040",marginBottom:12}}>{t.envelopesSub}</div>
+              <ExBox text={t.envelopesEx}/>
+              <div style={{padding:"11px 14px",borderRadius:12,border:"1px solid #B4FF0030",background:"#0F2010",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:10,height:10,borderRadius:"50%",background:"#B4FF00",flexShrink:0}}/>
+                <span style={{fontSize:14,color:"#B4FF00",fontWeight:700,flex:1}}>{t.tresorerie}</span>
+                <span style={{fontSize:10,color:"#3A6040",fontWeight:700}}>{t.system_label}</span>
+              </div>
+              {envs.map((e,i)=>(
+                <div key={e.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <div style={{width:12,height:12,borderRadius:"50%",background:e.color,flexShrink:0}}/>
+                  <input value={e.label} onChange={ev=>setEnvs(p=>p.map((x,j)=>j===i?{...x,label:ev.target.value}:x))}
+                    style={{...inp,flex:1,padding:"10px 12px",fontSize:14}}/>
+                  <button onClick={()=>setEnvs(p=>p.filter((_,j)=>j!==i))} style={{background:"#1A0808",border:"none",color:"#F87171",borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:16,flexShrink:0}}>×</button>
+                </div>
+              ))}
+              <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
+                <div style={{width:12,height:12,borderRadius:"50%",background:newEnvColor,flexShrink:0}}/>
+                <input value={newEnvLabel} onChange={e=>setNEL(e.target.value)} placeholder={t.envelopesAdd}
+                  style={{...inp,flex:1,padding:"10px 12px",fontSize:14}}
+                  onKeyDown={e=>{if(e.key==="Enter"&&newEnvLabel.trim()){setEnvs(p=>[...p,{id:uid(),label:newEnvLabel.trim(),color:newEnvColor}]);setNEL("");}}}/>
+                <input type="color" value={newEnvColor} onChange={e=>setNEC(e.target.value)}
+                  style={{width:34,height:34,borderRadius:8,border:"none",background:"none",cursor:"pointer",padding:0,flexShrink:0}}/>
+                <button onClick={()=>{if(!newEnvLabel.trim())return;setEnvs(p=>[...p,{id:uid(),label:newEnvLabel.trim(),color:newEnvColor}]);setNEL("");}}
+                  style={{padding:"0 14px",borderRadius:10,border:"none",background:"#B4FF00",color:"#020303",fontWeight:800,fontSize:18,cursor:"pointer",height:34,flexShrink:0}}>+</button>
+              </div>
+            </>
+          )}
+
+          {step_id==="subcats"&&(
+            <>
+              <div style={{fontSize:22,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.subcats}</div>
+              <div style={{fontSize:13,color:"#3A6040",marginBottom:12}}>{t.subcatsSub}</div>
+              <ExBox text={t.subcatsEx}/>
+              {envs.map(e=>{
+                const items=subcatMap[e.id]||[];
+                const newLabel=newScLabels[e.id]||"";
+                return (
+                  <div key={e.id} style={{marginBottom:16}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:e.color}}/>
+                      <span style={{fontSize:13,fontWeight:700,color:e.color}}>{e.label}</span>
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+                      {items.map((lbl,li)=>(
+                        <div key={li} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:20,background:"#060E08",border:"1px solid #1E3D22"}}>
+                          <span style={{fontSize:12,color:"#E8FFD4"}}>{lbl}</span>
+                          <button onClick={()=>setSubcatMap(m=>({...m,[e.id]:items.filter((_,j)=>j!==li)}))}
+                            style={{background:"none",border:"none",color:"#F87171",cursor:"pointer",padding:0,fontSize:13,lineHeight:1}}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <input value={newLabel} onChange={ev=>setNewScLabels(m=>({...m,[e.id]:ev.target.value}))}
+                        placeholder={t.subcatsAdd} style={{...inp,flex:1,padding:"9px 12px",fontSize:13}}
+                        onKeyDown={ev=>{if(ev.key==="Enter"&&newLabel.trim()){setSubcatMap(m=>({...m,[e.id]:[...items,newLabel.trim()]}));setNewScLabels(m=>({...m,[e.id]:""}));}}}/>
+                      <button onClick={()=>{if(!newLabel.trim())return;setSubcatMap(m=>({...m,[e.id]:[...items,newLabel.trim()]}));setNewScLabels(m=>({...m,[e.id]:""}));}}
+                        style={{padding:"0 14px",borderRadius:10,border:"none",background:"#B4FF00",color:"#020303",fontWeight:800,fontSize:18,cursor:"pointer",height:36,flexShrink:0}}>+</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {step_id==="revenus"&&(
+            <>
+              <div style={{fontSize:22,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.revenues}</div>
+              <div style={{fontSize:13,color:"#3A6040",marginBottom:12}}>{t.revenuesSub}</div>
+              <ExBox text={t.revenuesEx}/>
+              {rules.map((r,ri)=>{
+                const allE=[{id:"tresorerie",label:t.tresorerie,color:"#B4FF00"},...envs];
+                const total=allE.reduce((a,e)=>a+(parseFloat(r.split[e.id])||0),0);
+                const valid=Math.round(total)===100;
+                return (
+                  <div key={r.key} style={{background:"#060E08",borderRadius:14,padding:"14px",border:`1.5px solid ${valid?"#B4FF0040":"#122416"}`,marginBottom:12}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                      <span style={{fontSize:20}}>{r.icon}</span>
+                      <input value={r.label} onChange={e=>setRules(p=>p.map((x,i)=>i===ri?{...x,label:e.target.value}:x))}
+                        style={{...inp,flex:1,padding:"6px 10px",fontSize:14,fontWeight:700}}/>
+                      <span style={{fontSize:11,fontWeight:700,color:valid?"#34D399":"#F87171",flexShrink:0}}>{Math.round(total)}%</span>
+                      {rules.length>1&&<button onClick={()=>setRules(p=>p.filter((_,i)=>i!==ri))} style={{background:"none",border:"none",color:"#F87171",cursor:"pointer",fontSize:16,flexShrink:0}}>×</button>}
+                    </div>
+                    {allE.map(e=>(
+                      <div key={e.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:e.color,flexShrink:0}}/>
+                        <span style={{fontSize:13,color:"#E8FFD4",flex:1}}>{e.label}</span>
+                        <input type="number" min="0" max="100" value={r.split[e.id]??0}
+                          onChange={ev=>setRules(p=>p.map((x,i)=>i===ri?{...x,split:{...x.split,[e.id]:ev.target.value}}:x))}
+                          style={{width:52,padding:"4px 8px",borderRadius:8,border:"1px solid #122416",background:"#040806",color:"#E8FFD4",fontSize:13,fontWeight:700,outline:"none",textAlign:"center"}}/>
+                        <span style={{fontSize:12,color:"#3A6040"}}>%</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+              <button onClick={()=>setRules(p=>[...p,{key:uid(),label:"Nouveau revenu",icon:"💰",color:"#F472B6",split:makeDefaultSplit()}])}
+                style={{width:"100%",padding:"11px 0",borderRadius:12,border:"1px solid #122416",background:"#060E08",color:"#3A6040",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:4}}>
+                {t.revenuesAdd}
+              </button>
+            </>
+          )}
+
+        </div>
+
+        <div style={{padding:"0 24px 40px",display:"flex",gap:10}}>
+          {step>0&&step_id!=="import_confirm"&&(
+            <Btn secondary onClick={()=>step===1?(setMode(null),setStep(0)):setStep(s=>s-1)}>{t.back}</Btn>
+          )}
+          {step_id==="import_confirm"&&(
+            <>
+              <Btn secondary onClick={()=>{ setMode(null); setStep(0); }}>{t.back}</Btn>
+              <Btn active={canNext} onClick={finish}>{t.go}</Btn>
+            </>
+          )}
+          {step_id!=="welcome"&&step_id!=="revenus"&&step_id!=="import_confirm"&&(
+            <Btn active={canNext} onClick={()=>setStep(s=>s+1)}>{t.next}</Btn>
+          )}
+          {step_id==="revenus"&&(
+            <Btn active={allRulesValid} onClick={finish}>{t.go}</Btn>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PROFILE SETTINGS OVERLAY ────────────────────────────────────────────────
+function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, setSeuils, onClose }) {
+  const ps_cur    = pload(ps_pid, "currency", "Ar");
+  const ps_lang   = pload(ps_pid, "lang", "fr");
+  const ps_seuils = pload(ps_pid, SEUILS_KEY, { alerte:60000, blocage:25000 });
+
+  const [custA, setCustA] = useState(String(ps_seuils.alerte||60000));
+  const [custB, setCustB] = useState(String(ps_seuils.blocage||25000));
+
+  const profileName = profiles.find(p=>p.id===ps_pid)?.name || "";
+
+  function saveLang(code) {
+    psave(ps_pid, "lang", code);
+    if (ps_pid===pid) setLang(code);
+    onClose(); setTimeout(()=>{}, 0); // re-open with fresh state not needed here
+  }
+  function saveCurrency(code) {
+    psave(ps_pid, "currency", code);
+    if (ps_pid===pid) { setCurrency(code); fmt=makeFmt(code); }
+  }
+  function savePreset(preset) {
+    const s = { presetId:preset.id, alerte:preset.alerte, blocage:preset.blocage };
+    psave(ps_pid, SEUILS_KEY, s);
+    if (ps_pid===pid) setSeuils(s);
+  }
+  function saveCustom() {
+    const s = { presetId:"custom", alerte:parseInt(custA)||60000, blocage:parseInt(custB)||25000 };
+    psave(ps_pid, SEUILS_KEY, s);
+    if (ps_pid===pid) setSeuils(s);
+  }
+
+  // Re-read from storage each render so UI reflects changes
+  const cur_seuils = pload(ps_pid, SEUILS_KEY, { alerte:60000, blocage:25000 });
+  const cur_lang   = pload(ps_pid, "lang", "fr");
+  const cur_cur    = pload(ps_pid, "currency", "Ar");
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(2,3,3,0.97)",zIndex:400,display:"flex",flexDirection:"column",maxWidth:430,margin:"0 auto"}}>
+      <div style={{padding:"52px 20px 20px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontSize:18,fontWeight:800,color:T.text}}>⚙ {profileName}</div>
+        <button onClick={onClose} style={{background:"none",border:"none",color:T.sub,fontSize:24,cursor:"pointer"}}>×</button>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"20px"}}>
+
+        {/* LANGUE */}
+        <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>LANGUE</div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:24}}>
+          {Object.entries(LANGS).map(([code,label])=>{
+            const active = cur_lang===code;
+            return (
+              <button key={code} onClick={()=>saveLang(code)}
+                style={{padding:"12px 16px",borderRadius:12,border:`1.5px solid ${active?"#B4FF00":T.border}`,background:active?"#0F2010":T.card,color:active?"#B4FF00":T.text,fontSize:14,fontWeight:active?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between"}}>
+                {label}{active&&<span style={{color:"#B4FF00"}}>✓</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* SEUILS */}
+        <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>SEUILS D'ALERTE</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
+          {SEUILS_PRESETS.filter(p=>p.id!=="custom").map(preset=>{
+            const active = cur_seuils.presetId===preset.id;
+            return (
+              <button key={preset.id} onClick={()=>savePreset(preset)}
+                style={{padding:"12px 14px",borderRadius:12,border:`1.5px solid ${active?"#B4FF00":T.border}`,background:active?"#0F2010":T.card,cursor:"pointer",textAlign:"left"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                  <span style={{fontSize:13,fontWeight:700,color:active?"#B4FF00":T.text}}>{preset.emoji} {preset.label}</span>
+                  {active&&<span style={{color:"#B4FF00",fontSize:12}}>✓</span>}
+                </div>
+                <div style={{fontSize:11,color:"#3A6040",marginBottom:6}}>{preset.desc}</div>
+                <div style={{display:"flex",gap:12}}>
+                  <span style={{fontSize:11,color:"#FBBF24"}}>🟡 {new Intl.NumberFormat("fr-FR").format(preset.alerte)}</span>
+                  <span style={{fontSize:11,color:"#F87171"}}>🔴 {new Intl.NumberFormat("fr-FR").format(preset.blocage)}</span>
+                </div>
+              </button>
+            );
+          })}
+          {/* Personnalisé */}
+          <div style={{padding:"12px 14px",borderRadius:12,border:`1.5px solid ${cur_seuils.presetId==="custom"?"#B4FF00":T.border}`,background:cur_seuils.presetId==="custom"?"#0F2010":T.card}}>
+            <div style={{fontSize:13,fontWeight:700,color:cur_seuils.presetId==="custom"?"#B4FF00":T.text,marginBottom:10}}>✏️ Personnalisé</div>
+            <div style={{display:"flex",gap:8,marginBottom:10}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:10,color:"#FBBF24",fontWeight:700,marginBottom:4}}>🟡 ALERTE</div>
+                <input type="number" value={custA} onChange={e=>setCustA(e.target.value)}
+                  style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #1E3D22",background:"#040806",color:T.text,fontSize:13,outline:"none"}}/>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:10,color:"#F87171",fontWeight:700,marginBottom:4}}>🔴 BLOCAGE</div>
+                <input type="number" value={custB} onChange={e=>setCustB(e.target.value)}
+                  style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #1E3D22",background:"#040806",color:T.text,fontSize:13,outline:"none"}}/>
+              </div>
+            </div>
+            <button onClick={saveCustom}
+              style={{width:"100%",padding:"9px 0",borderRadius:8,border:"none",background:"#B4FF00",color:"#020303",fontSize:13,fontWeight:800,cursor:"pointer"}}>
+              Appliquer
+            </button>
+          </div>
+        </div>
+
+        {/* DEVISE */}
+        <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>DEVISE</div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {CURRENCIES.map(c=>{
+            const active = cur_cur===c.code;
+            return (
+              <button key={c.code} onClick={()=>saveCurrency(c.code)}
+                style={{padding:"12px 16px",borderRadius:12,border:`1.5px solid ${active?"#B4FF00":T.border}`,background:active?"#0F2010":T.card,color:active?"#B4FF00":T.text,fontSize:13,fontWeight:active?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between"}}>
+                {c.label}{active&&<span style={{color:"#B4FF00"}}>✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{padding:"16px 20px 32px"}}>
+        <button onClick={onClose} style={{width:"100%",padding:"13px 0",borderRadius:14,border:"none",background:"#B4FF00",color:"#020303",fontSize:15,fontWeight:800,cursor:"pointer"}}>
+          Fermer
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+// ─── OVERDRAFT MODAL ──────────────────────────────────────────────────────────
+function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm }) {
+  const { envId, envLabel, currentBal, amt, shortage } = overdraft;
+  const [selectedFallback, setSelectedFallback] = useState(null);
+  const fallbackEnvs = envelopes.filter(e=>e.id!==envId&&e.id!=="tresorerie"&&(bal[e.id]||0)>0);
+  const fallbackBal = selectedFallback ? (bal[selectedFallback]||0) : 0;
+  const covered     = selectedFallback ? Math.min(shortage, fallbackBal) : 0;
+  const remaining   = shortage - covered;
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(2,3,3,0.96)",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",padding:"0 0 32px"}}>
+      <div style={{width:"100%",maxWidth:430,background:"#060E08",borderRadius:"20px 20px 0 0",border:"1px solid #1E3D22",padding:"24px 20px 8px"}}>
+
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+          <span style={{fontSize:22}}>⚠️</span>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:"#F87171"}}>Solde insuffisant</div>
+            <div style={{fontSize:12,color:"#3A6040"}}>{envLabel} — {fmt(currentBal)} disponible</div>
+          </div>
+        </div>
+
+        <div style={{background:"#040806",borderRadius:12,padding:"12px 14px",marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+            <span style={{fontSize:12,color:"#3A6040"}}>Dépense</span>
+            <span style={{fontSize:13,fontWeight:700,color:"#E8FFD4"}}>{fmt(amt)}</span>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+            <span style={{fontSize:12,color:"#3A6040"}}>Solde {envLabel}</span>
+            <span style={{fontSize:13,fontWeight:700,color:"#F87171"}}>{fmt(currentBal)}</span>
+          </div>
+          <div style={{borderTop:"1px solid #122416",paddingTop:6,display:"flex",justifyContent:"space-between"}}>
+            <span style={{fontSize:12,color:"#3A6040"}}>Manque</span>
+            <span style={{fontSize:14,fontWeight:800,color:"#F87171"}}>{fmt(shortage)}</span>
+          </div>
+        </div>
+
+        <div style={{fontSize:11,fontWeight:700,color:"#3A6040",letterSpacing:1.5,marginBottom:10}}>
+          COUVRIR LE MANQUE DEPUIS
+        </div>
+
+        {fallbackEnvs.length===0?(
+          <div style={{padding:"12px 14px",borderRadius:12,background:"#1A0808",border:"1px solid #F8717140",marginBottom:16}}>
+            <div style={{fontSize:13,color:"#F87171",fontWeight:600}}>Aucune enveloppe disponible</div>
+            <div style={{fontSize:11,color:"#3A6040",marginTop:4}}>Le manque de {fmt(shortage)} passera en négatif sur {envLabel}.</div>
+          </div>
+        ):(
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+            {fallbackEnvs.map(e=>{
+              const active = selectedFallback===e.id;
+              const eBal   = bal[e.id]||0;
+              const canCover = Math.min(shortage, eBal);
+              return (
+                <button key={e.id} onClick={()=>setSelectedFallback(active?null:e.id)}
+                  style={{padding:"11px 14px",borderRadius:12,border:`1.5px solid ${active?e.color:"#122416"}`,background:active?"#0B1A0C":"#040806",cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:e.color}}/>
+                    <span style={{fontSize:13,fontWeight:700,color:active?e.color:"#E8FFD4"}}>{e.label}</span>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:active?e.color:"#3A6040"}}>{fmt(eBal)}</div>
+                    {active&&<div style={{fontSize:10,color:"#3A6040"}}>couvre {fmt(canCover)}</div>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {selectedFallback&&(
+          <div style={{background:"#040806",borderRadius:12,padding:"12px 14px",marginBottom:16,border:"1px solid #1E3D22"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <span style={{fontSize:12,color:"#3A6040"}}>{envLabel} après</span>
+              <span style={{fontSize:13,fontWeight:700,color:"#F87171"}}>{fmt(currentBal-amt)}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <span style={{fontSize:12,color:"#3A6040"}}>{envelopes.find(e=>e.id===selectedFallback)?.label} après</span>
+              <span style={{fontSize:13,fontWeight:700,color:"#E8FFD4"}}>{fmt(fallbackBal-covered)}</span>
+            </div>
+            {remaining>0&&(
+              <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid #122416",paddingTop:6}}>
+                <span style={{fontSize:11,color:"#F87171"}}>Reste en négatif</span>
+                <span style={{fontSize:12,fontWeight:700,color:"#F87171"}}>{fmt(remaining)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:10,paddingBottom:8}}>
+          <button onClick={onCancel}
+            style={{flex:1,padding:"13px 0",borderRadius:12,border:"1px solid #122416",background:"none",color:"#3A6040",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+            Annuler
+          </button>
+          <button onClick={()=>onConfirm(selectedFallback)}
+            style={{flex:2,padding:"13px 0",borderRadius:12,border:"none",background:"#F87171",color:"#020303",fontSize:14,fontWeight:800,cursor:"pointer"}}>
+            {!selectedFallback ? "Forcer (négatif)" : "Confirmer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const isDesktop = useIsDesktop();
   const [unlocked, setUnlocked] = useState(() => load(UNLOCKED_KEY, false));
@@ -475,9 +1301,34 @@ export default function App() {
   const [activeId,setActiveId]  = useState(()=>load("sf_active","default"));
   const [showProfiles,setShowP] = useState(false);
   const [newPName,setNPN]       = useState("");
+  const [profileSettings,setProfSettings] = useState(null); // { profileId } | null
 
   const pid = activeId; // shorthand
   const activeProfile = profiles.find(p=>p.id===pid)||profiles[0];
+
+  // ── Onboarding ──────────────────────────────────────────────────────────────
+  // null = no onboarding, { profileId, prefillName } = onboarding in progress
+  const [onboarding, setOnboarding] = useState(()=>{
+    // Trigger onboarding for default profile if it has never been configured
+    const defaultConfigured = load("sf_ob_default", false);
+    if (!defaultConfigured) return { profileId:"default", prefillName:"" };
+    return null;
+  });
+
+  // ── Language per profile ─────────────────────────────────────────────────────
+  const [lang, setLang] = useState(()=>pload(pid,"lang","fr"));
+  useEffect(()=>{ psave(pid,"lang",lang); },[lang,pid]);
+
+  // ── Currency per profile ─────────────────────────────────────────────────────
+  const [currency, setCurrency] = useState(()=>pload(pid,"currency","Ar"));
+  // Keep global fmt in sync with active profile currency
+  fmt = makeFmt(currency);
+  useEffect(()=>{ psave(pid,"currency",currency); },[currency,pid]);
+
+  // ── Seuils per profile ───────────────────────────────────────────────────────
+  const [seuils, setSeuils] = useState(()=>pload(pid, SEUILS_KEY, { alerte:60000, blocage:25000 }));
+  SEUILS = seuils; // keep global in sync
+  useEffect(()=>{ psave(pid, SEUILS_KEY, seuils); SEUILS=seuils; },[seuils,pid]);
 
   // ── Per-profile state (reloaded when profile switches) ──────────────────────
   const [tab,setTab]           = useState("home");
@@ -595,6 +1446,8 @@ export default function App() {
     setSF(pload(id,"sinks",[]));
     setRE(pload(id,"re",[]));
     setAmount(""); setLabel(""); setNote("");
+    setCurrency(pload(id,"currency","Ar"));
+    setLang(pload(id,"lang","fr"));
   }
 
   // Always protect system envelopes
@@ -625,7 +1478,7 @@ export default function App() {
   // ── EXPORT / IMPORT — per profile backup (works for ANY profile, not just active) ──
   function exportProfileById(profileId, profileName) {
     const data = {
-      app: "spec-finance",
+      app: "kajy",
       version: 1,
       exportedAt: new Date().toISOString(),
       profile: { id: profileId, name: profileName },
@@ -645,7 +1498,7 @@ export default function App() {
     const a = document.createElement("a");
     const safeName = profileName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     a.href = url;
-    a.download = `spec-finance-${safeName}-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `kajy-${safeName}-${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -699,7 +1552,31 @@ export default function App() {
     const np = makeDefaultProfile(newPName.trim());
     setProfiles(p=>[...p,np]);
     setNPN("");
-    switchProfile(np.id);
+    setShowP(false);
+    // Launch onboarding for new profile
+    setOnboarding({ profileId: np.id, prefillName: newPName.trim() });
+  }
+
+  function completeOnboarding({ name, currency: cur, lang: lg, envelopes: envs, incomeRules: ir, subcats: sc, imported }) {
+    const pid2 = onboarding.profileId;
+    // Rename profile if name changed
+    setProfiles(ps=>ps.map(p=>p.id===pid2?{...p,name:name||p.name}:p));
+    // Save all profile data
+    psave(pid2,"currency", cur);
+    psave(pid2,"lang", lg||"fr");
+    psave(pid2,"env", envs);
+    psave(pid2,"sub", sc);
+    psave(pid2,"ir", ir);
+    const initBal = imported?.bal || Object.fromEntries(envs.map(e=>[e.id,0]));
+    psave(pid2,"bal", initBal);
+    psave(pid2,"txs", imported?.txs || []);
+    psave(pid2,"max", imported?.max || {});
+    psave(pid2,"sinks", imported?.sinks || []);
+    psave(pid2,"re",  imported?.re || []);
+    // Mark this profile as configured so onboarding doesn't re-trigger
+    save(`sf_ob_${pid2}`, true);
+    setOnboarding(null);
+    switchProfile(pid2);
   }
 
   function deleteProfile(id) {
@@ -724,25 +1601,69 @@ export default function App() {
   if(disponible<=SEUILS.blocage){sColor="#F87171";sBg="#1A0808";sMsg="🔴 Blocage — Survie uniquement";}
   else if(disponible<=SEUILS.alerte){sColor="#B4FF00";sBg="#141005";sMsg="🟡 Alerte — Relancer un client";}
 
+  // ── Overdraft modal ──────────────────────────────────────────────────────────
+  const [overdraft, setOverdraft] = useState(null);
+  // overdraft = { tx, envelopeId, envelopeLabel, currentBal, amt, shortage }
+
   function submit() {
     if(!amt) return;
     const tx={ id:uid(), date:new Date(txDate).toISOString(), type:addMode, amount:amt, label, note, incomeType, subcatId, recur };
-    const nb={...bal}, nm={...envMax};
+
     if(addMode==="income"){
       const rule=incomeRules[incomeType];
-      if(!rule) return; // safety: no valid income type selected, abort silently
+      if(!rule) return;
+      const nb={...bal}, nm={...envMax};
       Object.entries(rule.split).forEach(([k,p])=>{
-        if(p){
-          nb[k]=(nb[k]||0)+amt*p/100;
-          // RESET: new max = new balance after income
-          nm[k]=nb[k];
-        }
+        if(p){ nb[k]=(nb[k]||0)+amt*p/100; nm[k]=nb[k]; }
       });
-    } else {
-      const sc=subcats.find(s=>s.id===subcatId);
-      if(sc?.envelopeId) nb[sc.envelopeId]=Math.max(0,(nb[sc.envelopeId]||0)-amt);
+      setBal(nb); setEnvMax(nm); setTxs([tx,...txs]);
+      setAmount(""); setLabel(""); setNote(""); setShowNote(false); setRecur("none");
+      setTxDate(new Date().toISOString().slice(0,10)); setTab("home");
+      return;
     }
-    setBal(nb); setEnvMax(nm); setTxs([tx,...txs]);
+
+    // ── EXPENSE — check for overdraft ────────────────────────────────────────
+    const sc = subcats.find(s=>s.id===subcatId);
+    if(!sc?.envelopeId) return;
+    const envId = sc.envelopeId;
+    const currentBal = bal[envId]||0;
+
+    if(amt > currentBal) {
+      // Trigger overdraft modal
+      const env = envelopes.find(e=>e.id===envId);
+      setOverdraft({
+        tx, envId, envLabel:env?.label||envId,
+        currentBal, amt, shortage: amt - currentBal,
+      });
+      return;
+    }
+
+    // Normal expense — enough balance
+    const nb={...bal};
+    nb[envId]=(nb[envId]||0)-amt;
+    setBal(nb); setTxs([tx,...txs]);
+    setAmount(""); setLabel(""); setNote(""); setShowNote(false); setRecur("none");
+    setTxDate(new Date().toISOString().slice(0,10)); setTab("home");
+  }
+
+  function confirmOverdraft(fallbackEnvId) {
+    if(!overdraft) return;
+    const { tx, envId, currentBal, amt, shortage } = overdraft;
+    const nb = {...bal};
+
+    // Main envelope goes negative
+    nb[envId] = currentBal - amt;
+
+    // Fallback envelope covers what it can
+    if(fallbackEnvId && fallbackEnvId !== envId) {
+      const fallbackBal = nb[fallbackEnvId]||0;
+      const covered = Math.min(shortage, Math.max(0, fallbackBal));
+      if(covered > 0) nb[fallbackEnvId] = fallbackBal - covered;
+    }
+
+    setBal(nb);
+    setTxs([tx,...txs]);
+    setOverdraft(null);
     setAmount(""); setLabel(""); setNote(""); setShowNote(false); setRecur("none");
     setTxDate(new Date().toISOString().slice(0,10)); setTab("home");
   }
@@ -758,18 +1679,21 @@ export default function App() {
         if(rule) Object.entries(rule.split).forEach(([k,p]) => {
           if(p) {
             nb[k] = (nb[k]||0) + tx.amount*p/100;
-            // track max per envelope
             if((nb[k]||0) > (nm[k]||0)) nm[k] = nb[k];
           }
         });
       } else {
         const sc = subcats.find(s=>s.id===tx.subcatId);
-        if(sc?.envelopeId) nb[sc.envelopeId] = Math.max(0,(nb[sc.envelopeId]||0) - tx.amount);
+        if(sc?.envelopeId) nb[sc.envelopeId] = (nb[sc.envelopeId]||0) - tx.amount;
+        if(tx.fallbackEnvId && tx.fallbackCovered) {
+          nb[tx.fallbackEnvId] = (nb[tx.fallbackEnvId]||0) - tx.fallbackCovered;
+        }
       }
     });
-    // Keep sinking funds deducted from tresorerie
-    const sfTotal = sinkFunds.reduce((a,f)=>a+f.current, 0);
-    nb.tresorerie = Math.max(0, (nb.tresorerie||0) - sfTotal);
+    // ⚠️ Déduire les sinking funds alloués de la Trésorerie
+    // sf.current représente de l'argent "bloqué" dans la Trésorerie — il faut le soustraire
+    const sfTotal = sinkFunds.reduce((a,f)=>a+(f.current||0), 0);
+    if(sfTotal > 0) nb["tresorerie"] = (nb["tresorerie"]||0) - sfTotal;
     setBal(nb);
     setEnvMax(nm);
   }
@@ -796,6 +1720,26 @@ export default function App() {
     const f=sinkFunds.find(x=>x.id===sfId);
     if(f) setBal(b=>({...b,tresorerie:Math.max(0,(b.tresorerie||0)+f.current)})); // refund to tresorerie
     setSF(sinkFunds.filter(x=>x.id!==sfId));
+  }
+  function useSinkFund(sfId, amount, label, afterAction) {
+    const f = sinkFunds.find(x=>x.id===sfId);
+    if(!f||amount>f.current) return;
+    // Record as expense from trésorerie
+    const sc = subcats.find(s=>s.envelopeId==="tresorerie");
+    const tx = { id:uid(), date:new Date().toISOString(), type:"expense", amount, label:`${label} (SF)`, note:`Sinking Fund — ${f.label}`, subcatId:sc?.id||"", incomeType:"", recur:"none" };
+    setTxs(t=>[tx,...t]);
+    // Deduct from trésorerie balance directly (SF funds are already in trésorerie)
+    setBal(b=>({...b, tresorerie:(b.tresorerie||0)-amount}));
+    // Handle SF after use
+    if(afterAction==="close") {
+      // Refund remaining back to trésorerie then delete
+      const remaining = f.current - amount;
+      if(remaining>0) setBal(b=>({...b, tresorerie:(b.tresorerie||0)+remaining}));
+      setSF(sinkFunds.filter(x=>x.id!==sfId));
+    } else {
+      // Reset to zero, keep SF alive
+      setSF(sinkFunds.map(x=>x.id===sfId?{...x,current:0}:x));
+    }
   }
 
   // Recurring expenses functions
@@ -888,20 +1832,31 @@ export default function App() {
   // Subcats filtered by selected envelope for history
   const filteredSubcats = hEnv==="all" ? subcats : subcats.filter(s=>s.envelopeId===hEnv);
 
+  // ── LICENSE GATE — check once per device ────────────────────────────────────
+  const [licensed, setLicensed] = useState(()=>load(LICENSE_KEY, false));
+  if (!licensed) {
+    return <LicenseScreen onUnlock={()=>setLicensed(true)}/>;
+  }
+
   // ── LOCK GATE — show PIN screen until unlocked on this device ──────────────
   if (!unlocked) {
     return <LockScreen onUnlock={()=>setUnlocked(true)}/>;
   }
 
+  // ── ONBOARDING GATE ──────────────────────────────────────────────────────────
+  if (onboarding) {
+    return <OnboardingScreen onComplete={completeOnboarding} prefillName={onboarding.prefillName||""}/>;
+  }
+
   return (
-    <div style={{fontFamily:"'SF Pro Display','Space Grotesk',-apple-system,sans-serif",background:T.bg,minHeight:"100vh",color:T.text,display:"flex"}}>
+    <div style={{fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif",background:T.bg,minHeight:"100vh",color:T.text,display:"flex"}}>
 
       {/* ══ DESKTOP SIDEBAR ═══════════════════════════════════════════════════ */}
       {isDesktop && (
         <div style={{width:220,flexShrink:0,height:"100vh",position:"sticky",top:0,background:"#060E08",borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",padding:"28px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:32,padding:"0 8px"}}>
-            <div style={{width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,#B4FF00,#5FD34A)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:"#020303",flexShrink:0}}>SF</div>
-            <div style={{fontSize:15,fontWeight:800,color:T.text}}>Spec Finance</div>
+            <div style={{width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,#B4FF00,#5FD34A)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:"#020303",flexShrink:0}}>K</div>
+            <div style={{fontSize:15,fontWeight:800,color:T.text}}>Kajy</div>
           </div>
 
           {NAV_ITEMS.filter(t=>!t.big).map(t=>(
@@ -975,6 +1930,13 @@ export default function App() {
                     </svg>
                   </button>
 
+                  {/* Settings icon */}
+                  <button onClick={e=>{e.stopPropagation(); setProfSettings({ profileId:p.id });}} title="Paramètres" style={{background:"none",border:"none",color:T.sub,cursor:"pointer",padding:6,flexShrink:0,display:"flex"}}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                  </button>
+
                   {/* Export icon */}
                   <button onClick={e=>{e.stopPropagation();exportProfileById(p.id,p.name);}} title="Exporter" style={{background:"none",border:"none",color:T.sub,cursor:"pointer",padding:6,flexShrink:0,display:"flex"}}>
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1030,6 +1992,20 @@ export default function App() {
             <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:300}}>
               <ChangePinScreen onClose={()=>setShowChangePin(false)}/>
             </div>
+          )}
+
+          {/* Profile Settings overlay */}
+          {profileSettings&&(
+            <ProfileSettingsOverlay
+              ps_pid={profileSettings.profileId}
+              profiles={profiles}
+              pid={pid}
+              setProfiles={setProfiles}
+              setLang={setLang}
+              setCurrency={setCurrency}
+              setSeuils={setSeuils}
+              onClose={()=>setProfSettings(null)}
+            />
           )}
         </div>
       )}
@@ -1121,7 +2097,7 @@ export default function App() {
                   <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>SINKING FUNDS</div>
                   {sinkFunds.map((f,i)=>{
                     const totalAlloue=sinkFunds.reduce((a,x)=>a+x.current,0);
-                    return <SinkingCard key={f.id} fund={f} onDelete={deleteSink} onAdd={addToSink} tresorerie={bal.tresorerie||0} totalAlloue={totalAlloue}/>;
+                    return <SinkingCard key={f.id} fund={f} onDelete={deleteSink} onAdd={addToSink} onUse={useSinkFund} tresorerie={bal.tresorerie||0} totalAlloue={totalAlloue}/>;
                   })}
                 </div>
               )}
@@ -1154,7 +2130,7 @@ export default function App() {
             <div style={{textAlign:"center",padding:"6px 0 14px"}}>
               <div style={{fontSize:10,color:T.sub,letterSpacing:2,fontWeight:700,marginBottom:4}}>MONTANT</div>
               <div style={{fontSize:48,fontWeight:900,color:amount?T.text:T.border,letterSpacing:-2,lineHeight:1}}>
-                {amount||"0"} <span style={{fontSize:20,color:T.sub,fontWeight:600}}>{CURRENCY}</span>
+                {amount||"0"} <span style={{fontSize:20,color:T.sub,fontWeight:600}}>{currency}</span>
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:2,marginBottom:12}}>
@@ -1162,6 +2138,25 @@ export default function App() {
                 <button key={i} onClick={()=>pressKey(String(k))} style={{padding:"15px 0",fontSize:k==="⌫"?20:22,fontWeight:600,background:k==="⌫"?"#040806":"#080F09",border:`1px solid ${T.border}`,borderRadius:10,cursor:"pointer",color:k==="⌫"?"#F87171":T.text}}>{k}</button>
               ))}
             </div>
+            {/* ── Témoin seuil — uniquement en mode dépense ── */}
+            {addMode==="expense"&&disponible<=seuils.alerte&&(
+              <div style={{
+                padding:"10px 14px",borderRadius:12,marginBottom:10,
+                background:disponible<=seuils.blocage?"#1A0808":"#141005",
+                border:`1px solid ${disponible<=seuils.blocage?"#F87171":"#B4FF00"}`,
+                display:"flex",alignItems:"center",gap:10,
+              }}>
+                <span style={{fontSize:16,flexShrink:0}}>{disponible<=seuils.blocage?"🔴":"🟡"}</span>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:disponible<=seuils.blocage?"#F87171":"#B4FF00"}}>
+                    {disponible<=seuils.blocage?"Zone de blocage":"Zone d'alerte"}
+                  </div>
+                  <div style={{fontSize:11,color:"#3A6040"}}>
+                    Solde disponible : {fmt(disponible)} — Seuil : {fmt(disponible<=seuils.blocage?seuils.blocage:seuils.alerte)}
+                  </div>
+                </div>
+              </div>
+            )}
             <button onClick={submit} disabled={!amt} style={{width:"100%",padding:"14px 0",borderRadius:14,border:"none",cursor:amt?"pointer":"not-allowed",background:!amt?T.muted:addMode==="income"?"linear-gradient(135deg,#5FD34A,#B4FF00)":"linear-gradient(90deg,#DC2626,#F87171)",color:amt?"#fff":T.sub,fontSize:16,fontWeight:800}}>
               {addMode==="income"?"Enregistrer le revenu":"Enregistrer la dépense"}
             </button>
@@ -1296,7 +2291,7 @@ export default function App() {
 
             {sinkFunds.map((f,i)=>{
                     const totalAlloue=sinkFunds.reduce((a,x)=>a+x.current,0);
-                    return <SinkingCard key={f.id} fund={f} onDelete={deleteSink} onAdd={addToSink} tresorerie={bal.tresorerie||0} totalAlloue={totalAlloue}/>;
+                    return <SinkingCard key={f.id} fund={f} onDelete={deleteSink} onAdd={addToSink} onUse={useSinkFund} tresorerie={bal.tresorerie||0} totalAlloue={totalAlloue}/>;
                   })}
 
             <div style={{background:"#060E08",borderRadius:16,padding:"16px",border:`1px solid ${T.border}`,marginTop:16}}>
@@ -1678,6 +2673,17 @@ export default function App() {
         ))}
       </div>
       )}
+
+      {/* ── OVERDRAFT MODAL ── */}
+      {overdraft&&<OverdraftModal
+        overdraft={overdraft}
+        envelopes={envelopes}
+        bal={bal}
+        fmt={fmt}
+        onCancel={()=>setOverdraft(null)}
+        onConfirm={confirmOverdraft}
+      />}
+
       </div>
     </div>
   );
