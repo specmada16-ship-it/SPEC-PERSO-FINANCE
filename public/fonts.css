@@ -1,0 +1,5 @@
+/* ── Spec Finance — Fonts ────────────────────────────────────────────────────
+   Place this file in public/fonts.css
+   The service worker will cache these on first load, making them available offline.
+────────────────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap');
