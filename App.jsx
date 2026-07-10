@@ -121,7 +121,7 @@ const UNLOCKED_KEY = "sf_unlocked";
 // Format libre : 8-12 caractères alphanumériques, ex: "SF-A1B2C3D4"
 // L'utilisateur entre son code une fois → débloqué définitivement sur cet appareil.
 const VALID_LICENSES = [
-  "SK-ACCES2026",   // ← code de démo / test
+  "SF-DEMO2024",   // ← code de démo / test
   // Ajoute ici les codes Gumroad au fur et à mesure des ventes
 ];
 const LICENSE_KEY = "sf_licensed";
@@ -1519,7 +1519,9 @@ export default function App() {
     const a = document.createElement("a");
     const safeName = profileName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     a.href = url;
-    a.download = `kajy-${safeName}-${new Date().toISOString().slice(0,10)}.json`;
+    const now = new Date();
+    const ts = now.toISOString().slice(0,19).replace("T","-").replace(/:/g,"h").replace("hm","h").slice(0,18);
+    a.download = `kajy-${safeName}-${ts}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
