@@ -1711,33 +1711,27 @@ export default function App() {
     const totalAlloue = sinkFunds.reduce((a,f)=>a+f.current, 0);
     const sfDisponible = Math.max(0, (bal.tresorerie||0) - totalAlloue);
     if(amount > sfDisponible) return;
+    // Juste étiqueter — ne pas déduire de bal.tresorerie
+    // bal.tresorerie = solde total, l'étiquetage SF est virtuel
     setSF(sinkFunds.map(f=>f.id===sfId?{...f,current:Math.min(f.goal,f.current+amount)}:f));
-    setBal(b=>({...b,tresorerie:Math.max(0,(b.tresorerie||0)-amount)}));
   }
   function deleteSink(sfId) {
-    const f=sinkFunds.find(x=>x.id===sfId);
-    if(f) setBal(b=>({...b,tresorerie:Math.max(0,(b.tresorerie||0)+f.current)})); // refund to tresorerie
+    // Supprimer le SF — pas besoin de rembourser car on n'a jamais déduit de bal.tresorerie
     setSF(sinkFunds.filter(x=>x.id!==sfId));
   }
   function useSinkFund(sfId, amount, label, afterAction) {
     const f = sinkFunds.find(x=>x.id===sfId);
     if(!f||amount>f.current) return;
-    // Record as expense from trésorerie
+    // C'est ici qu'on déduit vraiment de la Trésorerie — au moment de l'utilisation réelle
     const sc = subcats.find(s=>s.envelopeId==="tresorerie");
     const tx = { id:uid(), date:new Date().toISOString(), type:"expense", amount, label:`${label} (SF)`, note:`Sinking Fund — ${f.label}`, subcatId:sc?.id||"", incomeType:"", recur:"none" };
     setTxs(t=>[tx,...t]);
-    // L'argent du SF est déjà dans la Trésorerie (addToSink l'a déjà déduit).
-    // On NE déduit PAS à nouveau de la Trésorerie.
-    // On met juste à jour le SF selon l'action choisie.
+    setBal(b=>({...b, tresorerie:(b.tresorerie||0)-amount}));
     if(afterAction==="close") {
-      // Rembourser le reste du SF vers la Trésorerie (montant non utilisé)
-      const remaining = f.current - amount;
-      if(remaining > 0) setBal(b=>({...b, tresorerie:(b.tresorerie||0)+remaining}));
+      // Clôturer — supprimer le SF, pas de remboursement (l'étiquetage était virtuel)
       setSF(sinkFunds.filter(x=>x.id!==sfId));
     } else {
-      // Remettre à zéro — rembourser tout le SF vers la Trésorerie
-      const remaining = f.current - amount;
-      if(remaining > 0) setBal(b=>({...b, tresorerie:(b.tresorerie||0)+remaining}));
+      // Remettre à zéro — garder le SF mais vider le current
       setSF(sinkFunds.map(x=>x.id===sfId?{...x,current:0}:x));
     }
   }
