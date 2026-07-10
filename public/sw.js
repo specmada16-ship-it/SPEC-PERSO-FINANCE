@@ -1,4 +1,4 @@
-const CACHE = "kajy-v4";
+const CACHE = "kajy-v5";
 const CORE_ASSETS = [
   "/",
   "/index.html",
