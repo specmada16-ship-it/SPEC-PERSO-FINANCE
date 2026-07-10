@@ -1097,6 +1097,26 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
           })}
         </div>
 
+        {/* COUSSIN SÉCURITÉ */}
+        <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>COUSSIN DE SÉCURITÉ TRÉSORERIE</div>
+        <div style={{background:T.card2,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`,marginBottom:20}}>
+          <div style={{fontSize:12,color:"#3A6040",marginBottom:10,lineHeight:1.5}}>
+            Le bouton 🚨 Urgence est bloqué tant que la Trésorerie est en dessous de ce montant.
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <input type="number"
+              defaultValue={pload(ps_pid,"coussin",100000)}
+              onBlur={e=>{
+                const v=parseInt(e.target.value)||100000;
+                psave(ps_pid,"coussin",v);
+                if(ps_pid===pid) setCoussin(v);
+              }}
+              style={{flex:1,padding:"10px 12px",borderRadius:10,border:"1px solid #1E3D22",background:"#040806",color:"#B4FF00",fontSize:16,fontWeight:800,outline:"none"}}/>
+            <span style={{fontSize:13,color:"#3A6040",fontWeight:600}}>{pload(ps_pid,"currency","Ar")}</span>
+          </div>
+          <div style={{fontSize:11,color:"#1E3D22",marginTop:8}}>Idéalement = 3 mois de dépenses de survie</div>
+        </div>
+
         {/* SEUILS */}
         <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>SEUILS D'ALERTE</div>
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
@@ -1448,6 +1468,7 @@ export default function App() {
     setAmount(""); setLabel(""); setNote("");
     setCurrency(pload(id,"currency","Ar"));
     setLang(pload(id,"lang","fr"));
+    setCoussin(pload(id,"coussin",100000));
   }
 
   // Always protect system envelopes
@@ -1600,6 +1621,36 @@ export default function App() {
   let sColor="#34D399",sBg="#061510",sMsg="✅ Situation stable";
   if(disponible<=SEUILS.blocage){sColor="#F87171";sBg="#1A0808";sMsg="🔴 Blocage — Survie uniquement";}
   else if(disponible<=SEUILS.alerte){sColor="#B4FF00";sBg="#141005";sMsg="🟡 Alerte — Relancer un client";}
+
+  // ── Coussin sécurité Trésorerie ──────────────────────────────────────────────
+  const COUSSIN_KEY = "coussin";
+  const [coussin, setCoussin] = useState(()=>pload(pid, COUSSIN_KEY, 100000));
+  useEffect(()=>{ psave(pid, COUSSIN_KEY, coussin); },[coussin,pid]);
+
+  // ── Urgence Trésorerie ───────────────────────────────────────────────────────
+  const [urgencyModal, setUrgencyModal] = useState(null);
+  // urgencyModal = null | { step: "confirm"|"pin"|"done", amt, label, pinInput, pinError }
+
+  function submitUrgency(pinCode) {
+    if(!urgencyModal) return;
+    const amount = parseFloat(urgencyModal.amt)||0;
+    if(!amount||!urgencyModal.label.trim()) return;
+    const storedPin = load(PIN_KEY, null);
+    if(pinCode !== storedPin) {
+      setUrgencyModal(u=>({...u, pinError:true, pinInput:""}));
+      setTimeout(()=>setUrgencyModal(u=>u?{...u,pinError:false}:null), 600);
+      return;
+    }
+    // Enregistrer la dépense urgence
+    const sc = subcats.find(s=>s.envelopeId==="tresorerie");
+    const tx = { id:uid(), date:new Date().toISOString(), type:"expense", amount,
+      label:`🚨 ${urgencyModal.label.trim()}`, note:"Urgence Trésorerie",
+      subcatId:sc?.id||"", incomeType:"", recur:"none" };
+    setTxs(t=>[tx,...t]);
+    setBal(b=>({...b, tresorerie:(b.tresorerie||0)-amount}));
+    setUrgencyModal({step:"done", amt:urgencyModal.amt, label:urgencyModal.label});
+    setTimeout(()=>setUrgencyModal(null), 1500);
+  }
 
   // ── Overdraft modal ──────────────────────────────────────────────────────────
   const [overdraft, setOverdraft] = useState(null);
@@ -2066,8 +2117,19 @@ export default function App() {
                         <div style={{fontSize:14,fontWeight:700,color:"#B4FF00"}}>🟡 Trésorerie</div>
                         <div style={{fontSize:11,color:T.sub,marginTop:2}}>Réserve intouchable</div>
                       </div>
-                      <div style={{textAlign:"right"}}>
+                      <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
                         <div style={{fontSize:20,fontWeight:900,color:"#B4FF00"}}>{fmt(bal.tresorerie||0)}</div>
+                        {(bal.tresorerie||0) >= coussin ? (
+                          <button onClick={()=>setUrgencyModal({step:"confirm",amt:"",label:"",pinInput:"",pinError:false})}
+                            style={{padding:"4px 10px",borderRadius:8,border:"1px solid #2A1010",background:"#0D0404",color:"#F87171",fontSize:10,fontWeight:700,cursor:"pointer",letterSpacing:.5}}>
+                            🚨 Urgence
+                          </button>
+                        ) : (
+                          <div title={`Coussin min : ${fmt(coussin)}`}
+                            style={{padding:"4px 10px",borderRadius:8,border:"1px solid #122416",background:"#040806",color:"#1E3D22",fontSize:10,fontWeight:700,letterSpacing:.5,cursor:"not-allowed"}}>
+                            🚨 Urgence
+                          </div>
+                        )}
                       </div>
                     </div>
                     {sinkFunds.length>0&&(
@@ -2666,6 +2728,113 @@ export default function App() {
           </button>
         ))}
       </div>
+      )}
+
+      {/* ── URGENCE MODAL ── */}
+      {urgencyModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(2,3,3,0.97)",zIndex:600,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",padding:"0 0 32px",fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif"}}>
+          <div style={{width:"100%",maxWidth:430,background:"#060E08",borderRadius:"20px 20px 0 0",border:"1px solid #2A1010",overflow:"hidden"}}>
+
+            {/* Header */}
+            <div style={{background:"#1A0808",borderBottom:"1px solid #2A1010",padding:"20px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:16,fontWeight:800,color:"#F87171"}}>🚨 Urgence Trésorerie</div>
+                <div style={{fontSize:12,color:"#3A6040",marginTop:3}}>Cette action sera tracée dans l'historique.</div>
+              </div>
+              <button onClick={()=>setUrgencyModal(null)} style={{background:"none",border:"none",color:"#3A6040",fontSize:22,cursor:"pointer"}}>×</button>
+            </div>
+
+            <div style={{padding:"20px"}}>
+
+              {/* Étape 1 — Confirmation */}
+              {urgencyModal.step==="confirm"&&(
+                <>
+                  <div style={{background:"#100808",borderRadius:12,padding:"14px",border:"1px solid #2A1010",marginBottom:16,textAlign:"center"}}>
+                    <div style={{fontSize:24,marginBottom:6}}>‼️</div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#F87171",marginBottom:4}}>C'est vraiment une urgence ?</div>
+                    <div style={{fontSize:12,color:"#3A6040",lineHeight:1.5}}>La Trésorerie est ta réserve de sécurité.<br/>Ne l'utilise que si c'est absolument nécessaire.</div>
+                  </div>
+                  <div style={{fontSize:10,color:"#3A6040",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>DESCRIPTION DE L'URGENCE</div>
+                  <input value={urgencyModal.label} onChange={e=>setUrgencyModal(u=>({...u,label:e.target.value}))}
+                    placeholder="Ex : Médicaments urgents, Réparation…"
+                    style={{width:"100%",padding:"11px 12px",borderRadius:10,border:"1px solid #2A1010",background:"#040806",color:"#E8FFD4",fontSize:14,outline:"none",marginBottom:12,boxSizing:"border-box"}}/>
+                  <div style={{fontSize:10,color:"#3A6040",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>MONTANT</div>
+                  <input type="number" value={urgencyModal.amt} onChange={e=>setUrgencyModal(u=>({...u,amt:e.target.value}))}
+                    placeholder="0"
+                    style={{width:"100%",padding:"11px 12px",borderRadius:10,border:"1px solid #2A1010",background:"#040806",color:"#F87171",fontSize:18,fontWeight:800,outline:"none",marginBottom:20,boxSizing:"border-box"}}/>
+                  <div style={{display:"flex",gap:10}}>
+                    <button onClick={()=>setUrgencyModal(null)}
+                      style={{flex:1,padding:"13px 0",borderRadius:12,border:"1px solid #122416",background:"none",color:"#3A6040",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                      Annuler
+                    </button>
+                    <button onClick={()=>{
+                      if(!urgencyModal.label.trim()||!parseFloat(urgencyModal.amt)) return;
+                      setUrgencyModal(u=>({...u,step:"pin",pinInput:"",pinError:false}));
+                    }}
+                      disabled={!urgencyModal.label.trim()||!parseFloat(urgencyModal.amt)}
+                      style={{flex:2,padding:"13px 0",borderRadius:12,border:"none",background:urgencyModal.label.trim()&&parseFloat(urgencyModal.amt)?"#F87171":"#1A0808",color:urgencyModal.label.trim()&&parseFloat(urgencyModal.amt)?"#020303":"#3A6040",fontSize:14,fontWeight:800,cursor:"pointer"}}>
+                      Oui, c'est urgent →
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Étape 2 — PIN */}
+              {urgencyModal.step==="pin"&&(
+                <>
+                  <div style={{textAlign:"center",marginBottom:24}}>
+                    <div style={{fontSize:14,fontWeight:700,color:"#E8FFD4",marginBottom:4}}>Confirme avec ton code PIN</div>
+                    <div style={{fontSize:12,color:"#3A6040"}}>Montant : <span style={{color:"#F87171",fontWeight:700}}>{fmt(parseFloat(urgencyModal.amt)||0)}</span> — {urgencyModal.label}</div>
+                  </div>
+                  <div style={{display:"flex",gap:14,justifyContent:"center",marginBottom:28}}>
+                    {[0,1,2,3].map(i=>(
+                      <div key={i} style={{width:14,height:14,borderRadius:"50%",
+                        background:i<(urgencyModal.pinInput?.length||0)?(urgencyModal.pinError?"#F87171":"#F87171"):"transparent",
+                        border:`2px solid ${urgencyModal.pinError?"#F87171":i<(urgencyModal.pinInput?.length||0)?"#F87171":"#1E3D22"}`,
+                        transition:"all .15s"}}/>
+                    ))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,width:240,margin:"0 auto"}}>
+                    {["1","2","3","4","5","6","7","8","9","","0","del"].map((k,i)=>{
+                      if(k==="") return <div key={i}/>;
+                      if(k==="del") return (
+                        <button key={i} onClick={()=>setUrgencyModal(u=>({...u,pinInput:(u.pinInput||"").slice(0,-1)}))}
+                          style={{height:56,borderRadius:"50%",border:"none",background:"none",color:"#E8FFD4",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8FFD4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>
+                          </svg>
+                        </button>
+                      );
+                      return (
+                        <button key={i} onClick={()=>{
+                          const next = (urgencyModal.pinInput||"")+k;
+                          if(next.length<=4) setUrgencyModal(u=>({...u,pinInput:next}));
+                          if(next.length===4) setTimeout(()=>submitUrgency(next), 150);
+                        }}
+                          style={{height:56,width:56,borderRadius:"50%",border:"1px solid #122416",background:"#060E08",color:"#E8FFD4",fontSize:20,fontWeight:600,cursor:"pointer",margin:"0 auto"}}>
+                          {k}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button onClick={()=>setUrgencyModal(u=>({...u,step:"confirm"}))}
+                    style={{width:"100%",marginTop:20,padding:"11px 0",borderRadius:12,border:"1px solid #122416",background:"none",color:"#3A6040",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                    ← Retour
+                  </button>
+                </>
+              )}
+
+              {/* Étape 3 — Done */}
+              {urgencyModal.step==="done"&&(
+                <div style={{textAlign:"center",padding:"20px 0"}}>
+                  <div style={{fontSize:36,marginBottom:12}}>✅</div>
+                  <div style={{fontSize:16,fontWeight:800,color:"#E8FFD4",marginBottom:4}}>Dépense enregistrée</div>
+                  <div style={{fontSize:13,color:"#3A6040"}}>{fmt(parseFloat(urgencyModal.amt)||0)} déduits de la Trésorerie</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── OVERDRAFT MODAL ── */}
