@@ -2,7 +2,7 @@
   "name": "Kajy",
   "short_name": "Kajy",
   "description": "Gestion financière personnelle — enveloppes, sinking funds, récurrents",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#020303",
