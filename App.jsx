@@ -121,7 +121,7 @@ const UNLOCKED_KEY = "sf_unlocked";
 // Format libre : 8-12 caractères alphanumériques, ex: "SF-A1B2C3D4"
 // L'utilisateur entre son code une fois → débloqué définitivement sur cet appareil.
 const VALID_LICENSES = [
-  "KJ-ACCES2026",   // ← code de démo / test
+  "SF-DEMO2024",   // ← code de démo / test
   // Ajoute ici les codes Gumroad au fur et à mesure des ventes
 ];
 const LICENSE_KEY = "sf_licensed";
@@ -1690,10 +1690,8 @@ export default function App() {
         }
       }
     });
-    // ⚠️ Déduire les sinking funds alloués de la Trésorerie
-    // sf.current représente de l'argent "bloqué" dans la Trésorerie — il faut le soustraire
-    const sfTotal = sinkFunds.reduce((a,f)=>a+(f.current||0), 0);
-    if(sfTotal > 0) nb["tresorerie"] = (nb["tresorerie"]||0) - sfTotal;
+    // Les versements SF sont déjà dans l'historique des transactions (subcatId → trésorerie)
+    // Pas besoin de déduire sfTotal ici — ça causerait une double déduction
     setBal(nb);
     setEnvMax(nm);
   }
@@ -1728,16 +1726,18 @@ export default function App() {
     const sc = subcats.find(s=>s.envelopeId==="tresorerie");
     const tx = { id:uid(), date:new Date().toISOString(), type:"expense", amount, label:`${label} (SF)`, note:`Sinking Fund — ${f.label}`, subcatId:sc?.id||"", incomeType:"", recur:"none" };
     setTxs(t=>[tx,...t]);
-    // Deduct from trésorerie balance directly (SF funds are already in trésorerie)
-    setBal(b=>({...b, tresorerie:(b.tresorerie||0)-amount}));
-    // Handle SF after use
+    // L'argent du SF est déjà dans la Trésorerie (addToSink l'a déjà déduit).
+    // On NE déduit PAS à nouveau de la Trésorerie.
+    // On met juste à jour le SF selon l'action choisie.
     if(afterAction==="close") {
-      // Refund remaining back to trésorerie then delete
+      // Rembourser le reste du SF vers la Trésorerie (montant non utilisé)
       const remaining = f.current - amount;
-      if(remaining>0) setBal(b=>({...b, tresorerie:(b.tresorerie||0)+remaining}));
+      if(remaining > 0) setBal(b=>({...b, tresorerie:(b.tresorerie||0)+remaining}));
       setSF(sinkFunds.filter(x=>x.id!==sfId));
     } else {
-      // Reset to zero, keep SF alive
+      // Remettre à zéro — rembourser tout le SF vers la Trésorerie
+      const remaining = f.current - amount;
+      if(remaining > 0) setBal(b=>({...b, tresorerie:(b.tresorerie||0)+remaining}));
       setSF(sinkFunds.map(x=>x.id===sfId?{...x,current:0}:x));
     }
   }
