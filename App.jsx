@@ -121,7 +121,7 @@ const UNLOCKED_KEY = "sf_unlocked";
 // Format libre : 8-12 caractères alphanumériques, ex: "SF-A1B2C3D4"
 // L'utilisateur entre son code une fois → débloqué définitivement sur cet appareil.
 const VALID_LICENSES = [
-  "SF-DEMO2024",   // ← code de démo / test
+  "KJ-ACCES2026",   // ← code de démo / test
   // Ajoute ici les codes Gumroad au fur et à mesure des ventes
 ];
 const LICENSE_KEY = "sf_licensed";
