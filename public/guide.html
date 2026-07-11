@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kajy — Guide de démarrage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#020303;
+  --bg2:#060E08;
+  --bg3:#0B1A12;
+  --border:#1E3D22;
+  --lime:#B4FF00;
+  --lime2:#A6FF1A;
+  --green:#34D399;
+  --red:#F87171;
+  --yellow:#FBBF24;
+  --slate:#94A3B8;
+  --text:#F0FFE3;
+  --text2:#C8E6BE;
+  --text3:#7EAB6E;
+}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  font-size:15px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── HERO ── */
+.hero{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:flex-start;
+  padding:64px 48px;
+  position:relative;
+  overflow:hidden;
+  border-bottom:1px solid var(--border);
+}
+.hero::before{
+  content:'';
+  position:absolute;
+  top:-120px;right:-80px;
+  width:520px;height:520px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(180,255,0,.08) 0%,transparent 70%);
+  pointer-events:none;
+}
+.hero-eyebrow{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:11px;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--lime);
+  margin-bottom:28px;
+  display:flex;align-items:center;gap:10px;
+}
+.hero-eyebrow::before{
+  content:'';display:block;
+  width:24px;height:2px;
+  background:var(--lime);
+  border-radius:1px;
+}
+.hero h1{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:clamp(48px,8vw,80px);
+  font-weight:700;
+  line-height:1;
+  color:var(--text);
+  margin-bottom:16px;
+}
+.hero h1 span{color:var(--lime)}
+.hero-sub{
+  font-size:16px;
+  color:var(--text3);
+  max-width:420px;
+  margin-bottom:52px;
+  line-height:1.7;
+}
+.hero-chips{
+  display:flex;flex-wrap:wrap;gap:10px;
+}
+.chip{
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:6px 16px;
+  font-size:13px;
+  color:var(--text2);
+  display:flex;align-items:center;gap:7px;
+}
+.chip svg{flex-shrink:0}
+.scroll-hint{
+  position:absolute;bottom:36px;left:50%;transform:translateX(-50%);
+  color:var(--text3);font-size:12px;letter-spacing:.1em;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  animation:fadeup 2s ease infinite;
+}
+@keyframes fadeup{0%,100%{opacity:.3;transform:translateX(-50%) translateY(0)}50%{opacity:.8;transform:translateX(-50%) translateY(-6px)}}
+
+/* ── SECTIONS ── */
+.section{
+  padding:80px 48px;
+  border-bottom:1px solid var(--border);
+  max-width:860px;
+  margin:0 auto;
+}
+.section-label{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:11px;font-weight:600;
+  letter-spacing:.16em;text-transform:uppercase;
+  color:var(--lime);margin-bottom:10px;
+}
+.section h2{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:clamp(26px,4vw,36px);
+  font-weight:700;
+  color:var(--text);
+  margin-bottom:8px;
+  line-height:1.15;
+}
+.section .lead{
+  color:var(--text3);
+  font-size:15px;
+  max-width:560px;
+  margin-bottom:40px;
+}
+
+/* ── ENVELOPPES ── */
+.envelopes{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  margin-top:8px;
+}
+.env-card{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:24px 22px;
+  position:relative;
+  overflow:hidden;
+}
+.env-card::before{
+  content:'';
+  position:absolute;top:0;left:0;right:0;
+  height:3px;
+  border-radius:16px 16px 0 0;
+}
+.env-card.rouge::before{background:var(--red)}
+.env-card.lime::before{background:var(--lime)}
+.env-card.vert::before{background:var(--green)}
+.env-card.gris::before{background:var(--slate)}
+.env-icon{font-size:26px;margin-bottom:10px;display:block}
+.env-name{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:700;font-size:15px;
+  color:var(--text);margin-bottom:4px;
+}
+.env-role{
+  font-size:12px;color:var(--text3);
+  line-height:1.5;margin-bottom:12px;
+}
+.env-tags{display:flex;flex-wrap:wrap;gap:5px}
+.env-tag{
+  background:rgba(255,255,255,.04);
+  border-radius:6px;
+  padding:3px 8px;
+  font-size:11px;
+  color:var(--text2);
+}
+
+/* ── RÉPARTITION ── */
+.income-block{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:24px;
+  margin-bottom:16px;
+}
+.income-title{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:600;font-size:14px;
+  color:var(--text2);margin-bottom:18px;
+  display:flex;align-items:center;gap:8px;
+}
+.split-row{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:10px;
+}
+.split-dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;
+}
+.split-label{font-size:13px;color:var(--text2);flex:1}
+.split-pct{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:700;font-size:15px;
+  color:var(--text);
+  min-width:38px;text-align:right;
+}
+.split-bar-wrap{
+  width:100%;background:rgba(255,255,255,.06);
+  border-radius:99px;height:6px;margin-top:3px;
+  overflow:hidden;
+}
+.split-bar{height:100%;border-radius:99px}
+
+/* ── ÉTAPES ── */
+.steps{display:flex;flex-direction:column;gap:0}
+.step{
+  display:flex;gap:24px;
+  padding:28px 0;
+  border-bottom:1px solid var(--border);
+}
+.step:last-child{border-bottom:none}
+.step-num{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:11px;font-weight:700;
+  color:var(--lime);letter-spacing:.1em;
+  min-width:28px;padding-top:3px;
+}
+.step-body h3{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:600;font-size:16px;
+  color:var(--text);margin-bottom:5px;
+}
+.step-body p{font-size:13px;color:var(--text3);line-height:1.6}
+.step-body strong{color:var(--text2)}
+
+/* ── PRINCIPES ── */
+.rules{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+.rule-row{
+  display:flex;gap:14px;align-items:flex-start;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:16px 18px;
+}
+.rule-icon{
+  font-size:20px;flex-shrink:0;
+  width:36px;height:36px;
+  background:rgba(180,255,0,.07);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+}
+.rule-text{font-size:13px;color:var(--text2);line-height:1.6}
+.rule-text strong{color:var(--text);display:block;margin-bottom:2px;font-size:14px;font-family:'Space Grotesk',sans-serif}
+
+/* ── ALERTES ── */
+.alerts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+.alert-card{
+  border-radius:14px;
+  padding:20px 18px;
+  border:1px solid;
+}
+.alert-card.warn{
+  background:rgba(251,191,36,.05);
+  border-color:rgba(251,191,36,.2);
+}
+.alert-card.block{
+  background:rgba(248,113,113,.05);
+  border-color:rgba(248,113,113,.2);
+}
+.alert-amount{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:24px;font-weight:700;
+  margin-bottom:4px;
+}
+.alert-card.warn .alert-amount{color:var(--yellow)}
+.alert-card.block .alert-amount{color:var(--red)}
+.alert-label{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+.alert-card.warn .alert-label{color:rgba(251,191,36,.7)}
+.alert-card.block .alert-label{color:rgba(248,113,113,.7)}
+.alert-action{font-size:12px;color:var(--text3);line-height:1.5}
+
+/* ── INSTALL ── */
+.install-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px}
+.install-card{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:20px 16px;
+  text-align:center;
+}
+.install-card svg{margin-bottom:12px}
+.install-card h4{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:600;font-size:14px;
+  color:var(--text);margin-bottom:8px;
+}
+.install-card ol{
+  text-align:left;
+  padding-left:16px;
+  font-size:12px;
+  color:var(--text3);
+  line-height:1.7;
+}
+
+/* ── COMMENT ÇA MARCHE ── */
+.how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:8px}
+.how-card{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:24px 20px;
+}
+.how-icon{font-size:28px;margin-bottom:12px}
+.how-title{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:700;font-size:15px;
+  color:var(--text);margin-bottom:8px;
+}
+.how-desc{font-size:13px;color:var(--text3);line-height:1.65}
+.how-desc strong{color:var(--text2)}
+
+/* ── PIN ── */
+.pin-steps{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+.pin-step{
+  display:flex;gap:16px;align-items:flex-start;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:20px 18px;
+}
+.pin-num{
+  font-size:22px;flex-shrink:0;
+  width:42px;height:42px;
+  background:rgba(180,255,0,.06);
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+}
+.pin-title{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:600;font-size:15px;
+  color:var(--text);margin-bottom:4px;
+}
+.pin-desc{font-size:13px;color:var(--text3);line-height:1.6}
+.pin-desc strong{color:var(--text2)}
+
+/* ── FOOTER ── */
+footer{
+  padding:48px;
+  text-align:center;
+  color:var(--text3);
+  font-size:12px;
+  letter-spacing:.05em;
+}
+footer strong{color:var(--lime)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  .hero{padding:48px 24px}
+  .section{padding:60px 24px}
+  .envelopes{grid-template-columns:1fr}
+  .alerts{grid-template-columns:1fr}
+  .install-grid{grid-template-columns:1fr}
+  .how-grid{grid-template-columns:1fr}
+  footer{padding:40px 24px}
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">Guide de démarrage</div>
+  <h1>Ka<span>jy</span></h1>
+  <p class="hero-sub">Ton argent a toujours une destination. Dès qu'un revenu rentre, il est réparti. C'est tout.</p>
+  <div class="hero-chips">
+    <div class="chip">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path stroke="#B4FF00" stroke-width="2" stroke-linecap="round" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2"/><path stroke="#B4FF00" stroke-width="2" stroke-linecap="round" d="M12 6v6l4 2"/></svg>
+      Revenus irréguliers
+    </div>
+    <div class="chip">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path stroke="#B4FF00" stroke-width="2" stroke-linecap="round" d="M3 12h18M3 6h18M3 18h18"/></svg>
+      Enveloppes flexibles
+    </div>
+    <div class="chip">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path stroke="#B4FF00" stroke-width="2" stroke-linecap="round" d="M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2 2 6.48 2 12s4.48 10 10 10z"/><path stroke="#B4FF00" stroke-width="2" stroke-linecap="round" d="M2 12h20"/><path stroke="#B4FF00" stroke-width="2" stroke-linecap="round" d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Hors ligne
+    </div>
+    <div class="chip">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path stroke="#B4FF00" stroke-width="2" stroke-linecap="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke="#B4FF00" stroke-width="2"/><path stroke="#B4FF00" stroke-width="2" stroke-linecap="round" d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Multi-profils
+    </div>
+    <div class="chip">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#B4FF00" stroke-width="2"/><path stroke="#B4FF00" stroke-width="2" stroke-linecap="round" d="M12 8v4l3 2"/></svg>
+      9 devises
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#7EAB6E" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12l7 7 7-7"/></svg>
+  </div>
+</div>
+
+<!-- COMMENT ÇA MARCHE -->
+<div class="section">
+  <div class="section-label">L'application</div>
+  <h2>Simple à installer.<br>Fonctionne partout.</h2>
+  <p class="lead">Kajy est une PWA — pas besoin de passer par l'App Store. Elle s'installe depuis le navigateur et tourne hors ligne.</p>
+
+  <div class="how-grid">
+    <div class="how-card">
+      <div class="how-icon">📱</div>
+      <div class="how-title">Installable</div>
+      <div class="how-desc">iPhone : Safari → Partager → <strong>Sur l'écran d'accueil</strong>.<br>Android : Chrome → 3 points → Ajouter.<br>PC : icône d'installation dans la barre d'adresse.</div>
+    </div>
+    <div class="how-card">
+      <div class="how-icon">🌐</div>
+      <div class="how-title">Hors ligne</div>
+      <div class="how-desc">Après la première ouverture avec connexion, l'app fonctionne sans internet. Toutes les données restent accessibles.</div>
+    </div>
+    <div class="how-card">
+      <div class="how-icon">💾</div>
+      <div class="how-title">Sauvegarde régulière</div>
+      <div class="how-desc">Les données sont stockées localement. <strong>Exporter en JSON régulièrement</strong> — Profils → ↓ — pour ne pas tout perdre si le cache est effacé ou si tu changes d'appareil.</div>
+    </div>
+  </div>
+</div>
+
+<!-- LES 4 ENVELOPPES -->
+<div class="section">
+  <div class="section-label">La méthode</div>
+  <h2>Tes enveloppes,<br>ta réalité.</h2>
+  <p class="lead">L'app propose des enveloppes par défaut — mais tu crées les tiennes selon ta vie. La seule enveloppe fixe est la <strong style="color:var(--lime)">Trésorerie</strong> : c'est la réserve intouchable, toujours présente.</p>
+
+  <div class="envelopes">
+    <div class="env-card lime" style="grid-column:1/-1">
+      <span class="env-icon">🟡</span>
+      <div class="env-name">Trésorerie — toujours là</div>
+      <div class="env-role">Réserve intouchable. Ne compte jamais dans le solde disponible. Contient les Sinking Funds (épargne ciblée vers des objectifs précis).</div>
+      <div class="env-tags">
+        <span class="env-tag">Coussin 3 mois</span>
+        <span class="env-tag">Sinking funds</span>
+        <span class="env-tag">Objectifs longs terme</span>
+        <span class="env-tag">🔒 Non supprimable</span>
+      </div>
+    </div>
+
+    <!-- SINKING FUND -->
+    <div style="grid-column:1/-1;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px 22px;">
+      <div style="font-size:11px;color:var(--lime);font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:14px">Sinking Funds — à l'intérieur de la Trésorerie</div>
+      <p style="font-size:13px;color:var(--text3);line-height:1.65;margin-bottom:18px">Un Sinking Fund c'est une enveloppe d'épargne à l'intérieur de la Trésorerie avec un objectif précis et un montant cible. L'argent reste dans la Trésorerie — il est juste étiqueté.</p>
+
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="font-size:18px;width:36px;height:36px;background:rgba(180,255,0,.07);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🎯</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">Créer un SF</div>
+            <div style="font-size:12px;color:var(--text3);line-height:1.5">Accueil → <strong style="color:var(--text2)">+ Nouveau Sinking Fund</strong> → nom + icône + montant cible + versement mensuel indicatif. L'app calcule automatiquement le délai estimé.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="font-size:18px;width:36px;height:36px;background:rgba(180,255,0,.07);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">➕</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">Alimenter</div>
+            <div style="font-size:12px;color:var(--text3);line-height:1.5">Chaque versement est déduit du solde Trésorerie. Le bloc Trésorerie affiche en temps réel : <strong style="color:var(--text2)">Alloué SF</strong> et <strong style="color:var(--text2)">Disponible SF</strong>. Le total des SF ne peut pas dépasser le solde Trésorerie.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="font-size:18px;width:36px;height:36px;background:rgba(180,255,0,.07);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">✅</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">Utiliser</div>
+            <div style="font-size:12px;color:var(--text3);line-height:1.5">Objectif atteint → bouton <strong style="color:var(--text2)">Utiliser ce fond</strong>. Partiel ou total. Après utilisation : choisir de <strong style="color:var(--text2)">clôturer</strong> (supprimer le SF) ou <strong style="color:var(--text2)">remettre à zéro</strong> (recommencer l'épargne).</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:rgba(180,255,0,.05);border:1px solid rgba(180,255,0,.15);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--text3)">
+        💡 Exemple : SF "Laptop" → objectif 500 000 Ar, versement 50 000 Ar/mois → atteint en ~10 mois. Pendant ce temps, l'argent reste dans la Trésorerie et fructifie visuellement.
+      </div>
+    </div>
+    <div class="env-card rouge">
+      <span class="env-icon">🔴</span>
+      <div class="env-name">Exemple : Survie</div>
+      <div class="env-role">Ce qui maintient la vie quotidienne. Proposé par défaut — renomme-le selon ta situation.</div>
+      <div class="env-tags">
+        <span class="env-tag">Repas</span>
+        <span class="env-tag">Eau</span>
+        <span class="env-tag">Électricité</span>
+        <span class="env-tag">Hygiène</span>
+      </div>
+    </div>
+    <div class="env-card vert">
+      <span class="env-icon">🟢</span>
+      <div class="env-name">Exemple : Opérationnel</div>
+      <div class="env-role">Ce qui permet de travailler et d'aller chercher les prochains revenus.</div>
+      <div class="env-tags">
+        <span class="env-tag">Data</span>
+        <span class="env-tag">Déplacements</span>
+        <span class="env-tag">Matériel</span>
+      </div>
+    </div>
+    <div class="env-card gris" style="grid-column:1/-1">
+      <span class="env-icon">⚪</span>
+      <div class="env-name">Exemple : Différable</div>
+      <div class="env-role">Plaisir et non-urgent. Si ça peut attendre sans conséquence sur la vie ou le travail → ici. Tu peux créer autant d'enveloppes que nécessaire et les supprimer librement.</div>
+      <div class="env-tags">
+        <span class="env-tag">Sorties</span>
+        <span class="env-tag">Loisirs</span>
+        <span class="env-tag">Vêtements</span>
+        <span class="env-tag">+ Ajouter les tiennes</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RÉPARTITION -->
+<div class="section">
+  <div class="section-label">Dès qu'un revenu rentre</div>
+  <h2>Répartir avant<br>de dépenser.</h2>
+  <p class="lead">Chaque type de revenu a sa propre répartition — configurable à 100% dans l'app. L'aperçu s'affiche en temps réel avant de valider.</p>
+
+  <div class="income-block">
+    <div class="income-title">
+      🏠 Exemple : Revenu régulier
+      <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">Répartition suggérée</span>
+    </div>
+    <div class="split-row">
+      <div class="split-dot" style="background:var(--red)"></div>
+      <div class="split-label">Survie</div>
+      <div class="split-pct">60%</div>
+    </div>
+    <div class="split-bar-wrap"><div class="split-bar" style="width:60%;background:var(--red)"></div></div>
+    <div style="height:10px"></div>
+    <div class="split-row">
+      <div class="split-dot" style="background:var(--lime)"></div>
+      <div class="split-label">🟡 Trésorerie</div>
+      <div class="split-pct">30%</div>
+    </div>
+    <div class="split-bar-wrap"><div class="split-bar" style="width:30%;background:var(--lime)"></div></div>
+    <div style="height:10px"></div>
+    <div class="split-row">
+      <div class="split-dot" style="background:var(--green)"></div>
+      <div class="split-label">Opérationnel</div>
+      <div class="split-pct">10%</div>
+    </div>
+    <div class="split-bar-wrap"><div class="split-bar" style="width:10%;background:var(--green)"></div></div>
+  </div>
+
+  <div class="income-block">
+    <div class="income-title">
+      💼 Exemple : Revenu variable
+      <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">Répartition suggérée</span>
+    </div>
+    <div class="split-row">
+      <div class="split-dot" style="background:var(--lime)"></div>
+      <div class="split-label">🟡 Trésorerie</div>
+      <div class="split-pct">50%</div>
+    </div>
+    <div class="split-bar-wrap"><div class="split-bar" style="width:50%;background:var(--lime)"></div></div>
+    <div style="height:10px"></div>
+    <div class="split-row">
+      <div class="split-dot" style="background:var(--green)"></div>
+      <div class="split-label">Opérationnel</div>
+      <div class="split-pct">30%</div>
+    </div>
+    <div class="split-bar-wrap"><div class="split-bar" style="width:30%;background:var(--green)"></div></div>
+    <div style="height:10px"></div>
+    <div class="split-row">
+      <div class="split-dot" style="background:var(--slate)"></div>
+      <div class="split-label">Différable</div>
+      <div class="split-pct">20%</div>
+    </div>
+    <div class="split-bar-wrap"><div class="split-bar" style="width:20%;background:var(--slate)"></div></div>
+  </div>
+
+  <p style="font-size:12px;color:var(--text3);margin-top:12px;font-style:italic">
+    Ces % sont modifiables librement dans Catégories → Répartition %. Chaque type de revenu peut avoir sa propre logique. Total doit toujours faire 100%.
+  </p>
+</div>
+
+<!-- PREMIERS PAS -->
+<div class="section">
+  <div class="section-label">Dans l'app</div>
+  <h2>Par où commencer.</h2>
+  <p class="lead">Au premier lancement, un onboarding guidé configure tout en quelques étapes. Voici ce qui se passe.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <h3>Installer l'app</h3>
+        <p>Safari → Partager → <strong>Sur l'écran d'accueil</strong> (iPhone). Chrome → 3 points → Ajouter (Android). Icône d'installation dans la barre d'adresse (PC). L'icône Kajy apparaît comme une vraie app.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <h3>Onboarding au premier lancement</h3>
+        <p>L'app te guide en 7 étapes : <strong>langue → nom du profil → devise → enveloppes → sous-catégories → types de revenus</strong>. Tout est configurable ici — tu n'es pas obligé de garder les exemples proposés. Un profil importé depuis un backup .json saute ces étapes.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <h3>Choisir sa devise</h3>
+        <p>9 devises disponibles : <strong>Ar, XOF, XAF, EUR, MUR, KMF, DJF, SCR, USD</strong>. La devise s'affiche partout dans l'app et est modifiable par profil depuis les paramètres (⚙ sur chaque profil).</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <div class="step-body">
+        <h3>Entrer le premier revenu</h3>
+        <p>Bouton <strong>+</strong> → Revenu → montant → type de revenu. L'app affiche l'aperçu de répartition en temps réel. Valide — les enveloppes se remplissent automatiquement selon les % configurés.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">05</div>
+      <div class="step-body">
+        <h3>Enregistrer chaque dépense</h3>
+        <p>Bouton <strong>+</strong> → Dépense → montant → sous-catégorie. La couleur de l'enveloppe confirme que tu es au bon endroit. Si le solde est insuffisant, l'app propose de couvrir le manque depuis une autre enveloppe avant de forcer.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">06</div>
+      <div class="step-body">
+        <h3>Ajouter un deuxième profil</h3>
+        <p>Nom du profil en haut à gauche → bouton <strong>+</strong>. L'onboarding se relance pour le nouveau profil. Chaque profil est totalement indépendant — ses propres enveloppes, transactions, sinking funds, devise.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ALERTES -->
+<div class="section">
+  <div class="section-label">Solde disponible</div>
+  <h2>Deux seuils.<br>Action immédiate.</h2>
+  <p class="lead">Le solde disponible = toutes les enveloppes sauf Trésorerie. Ces seuils s'affichent automatiquement — et sont <strong style="color:var(--lime)">entièrement personnalisables</strong> dans les paramètres du profil.</p>
+
+  <div class="alerts">
+    <div class="alert-card warn">
+      <div class="alert-amount">50 000 Ar</div>
+      <div class="alert-label">⚠️ Alerte</div>
+      <div class="alert-action">Relancer un client. Réduire les dépenses immédiatement. Ne pas attendre.</div>
+    </div>
+    <div class="alert-card block">
+      <div class="alert-amount">20 000 Ar</div>
+      <div class="alert-label">🔴 Blocage</div>
+      <div class="alert-action">Besoins essentiels uniquement. Toute autre dépense est gelée jusqu'au prochain revenu.</div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;">
+    <div style="font-size:11px;color:var(--lime);font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px">3 presets disponibles</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+        <span style="color:var(--text2)">🌱 Vie simple</span>
+        <span style="color:var(--text3)">Alerte 35 000 · Blocage 15 000</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+        <span style="color:var(--text2)">⚡ Vie active</span>
+        <span style="color:var(--text3)">Alerte 60 000 · Blocage 25 000</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+        <span style="color:var(--text2)">🔥 Vie chargée</span>
+        <span style="color:var(--text3)">Alerte 100 000 · Blocage 50 000</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+        <span style="color:var(--text2)">✏️ Personnalisé</span>
+        <span style="color:var(--text3)">Tes propres montants</span>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--text3);margin-top:12px">Modifier depuis : Profils → ⚙ sur le profil → Seuils d'alerte.</p>
+  </div>
+</div>
+
+<!-- CODE PIN -->
+<div class="section">
+  <div class="section-label">Sécurité</div>
+  <h2>Ton code,<br>ton contrôle.</h2>
+  <p class="lead">Chaque utilisateur crée son propre code PIN à 4 chiffres. L'app ne se verrouille pas automatiquement — c'est toi qui décides quand la verrouiller.</p>
+
+  <div class="pin-steps">
+    <div class="pin-step">
+      <div class="pin-num">🔑</div>
+      <div class="pin-body">
+        <div class="pin-title">Créer son code</div>
+        <div class="pin-desc">Au premier lancement, l'app demande de définir un code à 4 chiffres. Ce code est propre à chaque appareil.</div>
+      </div>
+    </div>
+    <div class="pin-step">
+      <div class="pin-num">🔒</div>
+      <div class="pin-body">
+        <div class="pin-title">Verrouiller manuellement</div>
+        <div class="pin-desc">Profils → bouton <strong>🔒</strong> en bas à droite. L'app se verrouille immédiatement. Le code est demandé à la prochaine ouverture.</div>
+      </div>
+    </div>
+    <div class="pin-step">
+      <div class="pin-num">🔄</div>
+      <div class="pin-body">
+        <div class="pin-title">Changer le code</div>
+        <div class="pin-desc">Profils → bouton <strong>🔑</strong>. L'ancien code est demandé avant de pouvoir en définir un nouveau. Ne pas l'oublier — pas de réinitialisation sans lui.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRINCIPES -->
+<div class="section">
+  <div class="section-label">À retenir</div>
+  <h2>4 règles.<br>C'est suffisant.</h2>
+  <p class="lead"></p>
+
+  <div class="rules">
+    <div class="rule-row">
+      <div class="rule-icon">⚡</div>
+      <div class="rule-text">
+        <strong>Répartir d'abord, dépenser ensuite</strong>
+        Dès qu'un revenu rentre — ouvrir l'app avant de toucher à l'argent. La répartition prend 30 secondes.
+      </div>
+    </div>
+    <div class="rule-row">
+      <div class="rule-icon">🔒</div>
+      <div class="rule-text">
+        <strong>La Trésorerie n'existe pas</strong>
+        Ne jamais la compter dans le "disponible". Elle est là pour les vraies urgences et les objectifs long terme uniquement.
+      </div>
+    </div>
+    <div class="rule-row">
+      <div class="rule-icon">🗓️</div>
+      <div class="rule-text">
+        <strong>La semaine est l'unité de pilotage</strong>
+        Revenus irréguliers = on pilote à la semaine, pas au mois. Chaque lundi : regarder le solde. Chaque vendredi : comparer aux dépenses.
+      </div>
+    </div>
+    <div class="rule-row">
+      <div class="rule-icon">💾</div>
+      <div class="rule-text">
+        <strong>Exporter avant de changer d'appareil</strong>
+        Les données sont locales. Profils → icône ↓ → enregistrer le .json. Importer sur le nouvel appareil avec ↑.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- TRÉSORERIE URGENCE -->
+<div class="section">
+  <div class="section-label">Trésorerie</div>
+  <h2>Urgence Trésorerie.<br>Triple sécurité.</h2>
+  <p class="lead">La Trésorerie est intouchable — sauf vraie urgence. Un bouton 🚨 discret est disponible dans le bloc Trésorerie, mais seulement si le coussin minimum est atteint.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <h3>Coussin de sécurité</h3>
+        <p>Le bouton 🚨 Urgence est <strong>grisé</strong> tant que la Trésorerie est en dessous du coussin minimum. Par défaut : <strong>100 000 Ar</strong>. Modifiable dans Profils → ⚙ → Coussin de sécurité.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <h3>Confirmation obligatoire ‼️</h3>
+        <p>Un écran de confirmation s'affiche : "C'est vraiment une urgence ?" Tu dois saisir une description et un montant avant de continuer.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <h3>Code PIN requis</h3>
+        <p>Ton code PIN personnel est demandé pour valider. Sans le bon code — pas d'accès. La dépense est enregistrée avec le badge 🚨 dans l'historique.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SINKING FUNDS UTILISER -->
+<div class="section">
+  <div class="section-label">Sinking Funds</div>
+  <h2>Utiliser un Sinking Fund.</h2>
+  <p class="lead">Quand l'objectif est atteint — ou à tout moment partiellement — tu peux utiliser les fonds accumulés.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <h3>Bouton "Utiliser"</h3>
+        <p>Chaque Sinking Fund a un bouton <strong>"Utiliser partiellement"</strong>. Quand l'objectif est atteint à 100%, il devient <strong>"🎯 Utiliser ce fond"</strong> mis en évidence.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <h3>Choisir le montant et le label</h3>
+        <p>Tu peux utiliser tout ou partie du fond. Le label de la dépense est pré-rempli avec le nom du SF — modifiable. La dépense apparaît dans l'historique avec "(SF)".</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <h3>Clôturer ou remettre à zéro</h3>
+        <p><strong>Clôturer</strong> : le SF est supprimé après utilisation. <strong>Remettre à zéro</strong> : le SF reste actif et tu recommences l'épargne vers le même objectif.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OVERDRAFT -->
+<div class="section">
+  <div class="section-label">Dépenses</div>
+  <h2>Solde insuffisant.<br>Pas de blocage.</h2>
+  <p class="lead">Si tu essaies de dépenser plus que ce que contient une enveloppe, l'app ne bloque pas — elle t'accompagne.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <h3>Détection automatique</h3>
+        <p>Si le montant dépasse le solde de l'enveloppe, une modale s'ouvre avec le résumé : solde disponible, montant tenté, manque.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <h3>Choisir une enveloppe de secours</h3>
+        <p>Tu choisis quelle autre enveloppe couvre le manque. L'app affiche ce que chacune peut couvrir. Les enveloppes vides sont grisées.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <h3>Résultat</h3>
+        <p>L'enveloppe principale passe <strong>en négatif</strong> du montant total. L'enveloppe de secours est déduite du manque qu'elle couvre. Visible sur l'accueil en rouge jusqu'au renflouement.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT -->
+<div class="section">
+  <div class="section-label">Sauvegarde</div>
+  <h2>Export et Import.</h2>
+  <p class="lead">Tes données sont locales — elles restent sur ton appareil. L'export .json est le seul moyen de les sauvegarder ou de les transférer.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <h3>Exporter un profil</h3>
+        <p>Profils (haut gauche) → icône <strong>↓</strong> sur le profil. Un fichier <code>kajy-[nom]-[date-heure].json</code> est téléchargé. Chaque export a un nom unique incluant la date et l'heure — tu peux avoir plusieurs sauvegardes du même profil sans risque d'écrasement.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <h3>Importer sur un nouvel appareil</h3>
+        <p>Lors de la création d'un nouveau profil → écran de bienvenue → <strong>"Importer un profil existant"</strong> → choisir le fichier .json. Toutes les données sont restaurées.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <h3>Bonne pratique</h3>
+        <p>Exporter avant de changer d'appareil, avant une mise à jour importante, ou une fois par mois comme routine. Conserve les fichiers dans un dossier cloud (iCloud, Google Drive).</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <strong>Kajy</strong> — Guide de démarrage v4.0 · Juillet 2026<br>
+  <span style="opacity:.5">Antananarivo, Madagascar</span>
+</footer>
+
+</body>
+</html>
