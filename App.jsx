@@ -13,8 +13,23 @@ function useIsDesktop() {
   return isDesktop;
 }
 
-const T = { bg:"#020303", card:"#060E08", card2:"#0A1A0C", border:"#122416", text:"#E8FFD4", accent:"#B4FF00", accentD:"#A6FF1A", green:"#5FD34A", sub:"#3A6040", muted:"#080F09" };
+const DARK_THEME  = { bg:"#020303", card:"#060E08", card2:"#0A1A0C", border:"#122416", text:"#E8FFD4", accent:"#B4FF00", accentD:"#A6FF1A", green:"#5FD34A", sub:"#3A6040", muted:"#080F09", accentText:"#B4FF00", isDark:true };
+// Light: accent only on CTA buttons/borders, accentText for readable colored labels (#2D6A00 = AAA contrast on white)
+const LIGHT_THEME = { bg:"#F5F7F2", card:"#FFFFFF", card2:"#EEF3E8", border:"#C8DFB0", text:"#0D1F0F", accent:"#5C9E00", accentD:"#4A8200", green:"#059669", sub:"#4A6550", muted:"#E8F0DF", accentText:"#2D6A00", isDark:false };
+// T is a mutable reference updated at runtime — components read T directly
+let T = DARK_THEME;
+const THEME_KEY = "sf_theme";
 // ─── SEUILS ───────────────────────────────────────────────────────────────────
+// envTextColor: makes bright envelope colors readable on light backgrounds
+// #B4FF00 (lime) and similar neons are unreadable on white — darken them
+function envTextColor(hexColor) {
+  if (!T.isDark) {
+    // Map known neon colors to dark equivalents
+    const map = { "#B4FF00":"#2D6A00", "#A6FF1A":"#2D6A00", "#5FD34A":"#2A7A3A", "#34D399":"#0A6A4A" };
+    return map[hexColor] || hexColor;
+  }
+  return hexColor;
+}
 const SEUILS_KEY = "seuils";
 const SEUILS_PRESETS = [
   { id:"simple",  label:"Vie simple",  desc:"Peu de charges fixes — célibataire, pas de loyer, peu d'abonnements",  emoji:"🌱", alerte:35000,  blocage:15000 },
@@ -121,7 +136,7 @@ const UNLOCKED_KEY = "sf_unlocked";
 // Format libre : 8-12 caractères alphanumériques, ex: "SF-A1B2C3D4"
 // L'utilisateur entre son code une fois → débloqué définitivement sur cet appareil.
 const VALID_LICENSES = [
-  "KJ-ACCES2026",   // ← code de démo / test
+  "SF-DEMO2024",   // ← code de démo / test
   // Ajoute ici les codes Gumroad au fur et à mesure des ventes
 ];
 const LICENSE_KEY = "sf_licensed";
@@ -152,7 +167,7 @@ function LicenseScreen({ onUnlock }) {
         {success ? (
           <>
             <div style={{fontSize:36,marginBottom:12}}>✅</div>
-            <div style={{fontSize:18,fontWeight:800,color:"#B4FF00"}}>Accès débloqué !</div>
+            <div style={{fontSize:18,fontWeight:800,color:T.accentText}}>Accès débloqué !</div>
           </>
         ) : (
           <>
@@ -168,7 +183,7 @@ function LicenseScreen({ onUnlock }) {
               onKeyDown={e=>e.key==="Enter"&&check()}
               placeholder="Ex : SF-A1B2C3D4"
               autoCapitalize="characters"
-              style={{width:"100%",padding:"14px 16px",borderRadius:12,border:`1.5px solid ${error?"#F87171":"#1E3D22"}`,background:"#060E08",color:"#E8FFD4",fontSize:16,fontWeight:700,outline:"none",textAlign:"center",letterSpacing:2,marginBottom:12,boxSizing:"border-box"}}
+              style={{width:"100%",padding:"14px 16px",borderRadius:12,border:`1.5px solid ${error?"#F87171":"#1E3D22"}`,background:T.card,color:"#E8FFD4",fontSize:16,fontWeight:700,outline:"none",textAlign:"center",letterSpacing:2,marginBottom:12,boxSizing:"border-box"}}
             />
 
             {error && (
@@ -244,35 +259,43 @@ function LockScreen({ onUnlock }) {
               : mode === "confirm" ? "Entre à nouveau le même code."
               : "Entre ton code pour continuer.";
 
+  // PIN screen respects current theme
+  const dotActive   = error ? "#F87171" : T.accent;
+  const dotBorder   = error ? "#F87171" : T.border;
+  const btnBg       = T.isDark ? "#0D1A10" : "#FFFFFF";
+  const btnBorder   = T.isDark ? T.border : "#E0E8D8";
+  const btnColor    = T.text;
+  const btnShadow   = T.isDark ? "none" : "0 1px 4px rgba(0,0,0,0.08)";
+
   return (
-    <div style={{position:"fixed",inset:0,background:"#020303",zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif"}}>
+    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif"}}>
       <div style={{width:64,height:64,borderRadius:18,overflow:"hidden",marginBottom:24}}><img src="/icon-192.png" alt="Kajy" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>
-      <div style={{fontSize:19,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{title}</div>
-      <div style={{fontSize:13,color:"#3A6040",marginBottom:32}}>{sub}</div>
+      <div style={{fontSize:19,fontWeight:800,color:T.text,marginBottom:6}}>{title}</div>
+      <div style={{fontSize:13,color:T.sub,marginBottom:32}}>{sub}</div>
 
       <div style={{display:"flex",gap:14,marginBottom:40}}>
         {[0,1,2,3].map(i=>(
           <div key={i} style={{
             width:16,height:16,borderRadius:"50%",
-            background: i<input.length ? (error?"#F87171":"#B4FF00") : "transparent",
-            border:`2px solid ${error?"#F87171":i<input.length?"#B4FF00":"#1E3D22"}`,
+            background: i<input.length ? dotActive : "transparent",
+            border:`2px solid ${i<input.length ? dotActive : dotBorder}`,
             transition:"all .15s",
           }}/>
         ))}
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:18,width:260}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,width:260}}>
         {["1","2","3","4","5","6","7","8","9","","0","del"].map((k,i)=>{
           if (k === "") return <div key={i}/>;
           if (k === "del") return (
-            <button key={i} onClick={del} style={{height:64,borderRadius:"50%",border:"none",background:"none",color:"#E8FFD4",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E8FFD4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <button key={i} onClick={del} style={{height:64,borderRadius:"50%",border:"none",background:"none",color:T.sub,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.sub} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>
               </svg>
             </button>
           );
           return (
-            <button key={i} onClick={()=>press(k)} style={{height:64,width:64,borderRadius:"50%",border:"1px solid #122416",background:"#060E08",color:"#E8FFD4",fontSize:24,fontWeight:600,cursor:"pointer"}}>{k}</button>
+            <button key={i} onClick={()=>press(k)} style={{height:64,width:64,borderRadius:"50%",border:`1px solid ${btnBorder}`,background:btnBg,color:btnColor,fontSize:24,fontWeight:600,cursor:"pointer",boxShadow:btnShadow,margin:"0 auto"}}>{k}</button>
           );
         })}
       </div>
@@ -343,7 +366,7 @@ function ChangePinScreen({ onClose }) {
                   </svg>
                 </button>
               );
-              return <button key={i} onClick={()=>press(k)} style={{height:64,width:64,borderRadius:"50%",border:"1px solid #122416",background:"#060E08",color:"#E8FFD4",fontSize:24,fontWeight:600,cursor:"pointer"}}>{k}</button>;
+              return <button key={i} onClick={()=>press(k)} style={{height:64,width:64,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.card,color:"#E8FFD4",fontSize:24,fontWeight:600,cursor:"pointer"}}>{k}</button>;
             })}
           </div>
         </>
@@ -387,10 +410,10 @@ function LineChart({ txs, filter }) {
   return (
     <div style={{overflowX:"auto"}}>
       <svg width={W} height={H+24} style={{display:"block",margin:"0 auto"}}>
-        <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#B4FF00" stopOpacity="0.3"/><stop offset="100%" stopColor="#B4FF00" stopOpacity="0"/></linearGradient></defs>
+        <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={T.accent} stopOpacity="0.3"/><stop offset="100%" stopColor={T.accent} stopOpacity="0"/></linearGradient></defs>
         <path d={pathD+` L${toX(points.length-1)},${H} L${toX(0)},${H} Z`} fill="url(#lg)"/>
-        <path d={pathD} fill="none" stroke="#B4FF00" strokeWidth="2" strokeLinejoin="round"/>
-        {points.map((p,i)=><circle key={i} cx={toX(i)} cy={toY(p.bal)} r="2" fill="#B4FF00"/>)}
+        <path d={pathD} fill="none" stroke={T.accentText} strokeWidth="2" strokeLinejoin="round"/>
+        {points.map((p,i)=><circle key={i} cx={toX(i)} cy={toY(p.bal)} r="2" fill={T.accentText}/>)}
         {points.filter((_,i)=>i%step===0||i===points.length-1).map((p,i)=>(
           <text key={i} x={toX(points.indexOf(p))} y={H+16} textAnchor="middle" fontSize="8" fill={T.sub}>{p.label}</text>
         ))}
@@ -402,7 +425,7 @@ function LineChart({ txs, filter }) {
 // ─── ENVELOPE PROGRESS BAR ────────────────────────────────────────────────────
 function EnvBar({ env, balance, maxBalance }) {
   const pct = maxBalance > 0 ? Math.min(100, Math.round((balance / maxBalance) * 100)) : 0;
-  const barColor = pct > 50 ? env.color : pct > 20 ? "#B4FF00" : "#F87171";
+  const barColor = pct > 50 ? env.color : pct > 20 ? T.accent : "#F87171";
   return (
     <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px"}}>
       <div style={{width:42,height:42,borderRadius:13,background:env.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -411,7 +434,7 @@ function EnvBar({ env, balance, maxBalance }) {
       <div style={{flex:1,minWidth:0}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
           <span style={{fontSize:14,fontWeight:600,color:T.text}}>{env.label}</span>
-          <span style={{fontSize:13,fontWeight:800,color:env.color}}>{fmt(balance)}</span>
+          <span style={{fontSize:13,fontWeight:800,color:envTextColor(env.color)}}>{fmt(balance)}</span>
         </div>
         <div style={{height:5,background:T.muted,borderRadius:4,overflow:"hidden"}}>
           <div style={{height:"100%",width:pct+"%",background:barColor,borderRadius:4,transition:"width .4s ease"}}/>
@@ -440,19 +463,19 @@ function TxRow({ tx, onDelete, subcats, envelopes, incomeRules, last }) {
             {tx.label||(isInc?rule?.label:sc?.label||"Dépense")}
           </div>
           <div style={{fontSize:12,color:T.sub,display:"flex",gap:6,alignItems:"center"}}>
-            {!isInc&&env&&<span style={{color:env.color,fontSize:8}}>●</span>}
+            {!isInc&&env&&<span style={{color:envTextColor(env.color),fontSize:8}}>●</span>}
             {!isInc&&<span>{sc?.label}</span>}
             <span>{fmtD(tx.date)}</span>
-            {tx.recur&&tx.recur!=="none"&&<span style={{color:"#B4FF00"}}>🔄</span>}
+            {tx.recur&&tx.recur!=="none"&&<span style={{color:T.accentText}}>🔄</span>}
           </div>
         </div>
-        <div style={{fontSize:15,fontWeight:800,color:isInc?"#B4FF00":"#F87171",flexShrink:0,fontFamily:"monospace"}}>{isInc?"+":"−"}{fmt(tx.amount)}</div>
+        <div style={{fontSize:15,fontWeight:800,color:isInc?T.accentText:"#F87171",flexShrink:0,fontFamily:"monospace"}}>{isInc?"+":"−"}{fmt(tx.amount)}</div>
       </div>
       {open&&(
-        <div style={{background:"#040806",padding:"10px 16px",borderBottom:`1px solid ${T.border}`}}>
+        <div style={{background:T.card2,padding:"10px 16px",borderBottom:`1px solid ${T.border}`}}>
           {tx.note&&<div style={{fontSize:12,color:T.sub,marginBottom:6}}>📝 {tx.note}</div>}
           {isInc&&rule&&<div style={{fontSize:12,marginBottom:6}}>{Object.entries(rule.split).filter(([,p])=>p>0).map(([k,p])=>{ const e=envelopes.find(x=>x.id===k); return <span key={k} style={{marginRight:8,color:e?.color}}>{e?.label} {fmt(tx.amount*p/100)}</span>; })}</div>}
-          {tx.recur&&tx.recur!=="none"&&<div style={{fontSize:12,color:"#B4FF00",marginBottom:6}}>🔄 {RECUR_OPTIONS.find(r=>r.id===tx.recur)?.label}</div>}
+          {tx.recur&&tx.recur!=="none"&&<div style={{fontSize:12,color:T.accentText,marginBottom:6}}>🔄 {RECUR_OPTIONS.find(r=>r.id===tx.recur)?.label}</div>}
           <button onClick={()=>onDelete(tx.id)} style={{fontSize:12,color:"#F87171",background:"none",border:"none",cursor:"pointer",padding:0,fontWeight:700}}>🗑 Supprimer</button>
         </div>
       )}
@@ -482,7 +505,7 @@ function SplitEditor({ ruleKey, rule, envelopes, setIncomeRules }) {
     setIncomeRules(r=>({...r,[ruleKey]:{...r[ruleKey],split:purged}}));
   }
   return (
-    <div style={{background:"#060E08",borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`,marginBottom:8}}>
+    <div style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`,marginBottom:8}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
         <span>{rule.icon}</span>
         <span style={{fontSize:13,fontWeight:700,color:rule.color}}>{rule.label}</span>
@@ -493,11 +516,11 @@ function SplitEditor({ ruleKey, rule, envelopes, setIncomeRules }) {
           <span style={{width:8,height:8,borderRadius:"50%",background:env.color,flexShrink:0}}/>
           <span style={{fontSize:12,color:T.text,flex:1}}>{env.label}</span>
           <input type="number" min="0" max="100" value={splits[env.id]??0} onChange={e=>setSplits(s=>({...s,[env.id]:e.target.value}))}
-            style={{width:52,padding:"4px 8px",borderRadius:8,border:`1px solid ${T.border}`,background:"#040806",color:T.text,fontSize:13,fontWeight:700,outline:"none",textAlign:"center"}}/>
+            style={{width:52,padding:"4px 8px",borderRadius:8,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:13,fontWeight:700,outline:"none",textAlign:"center"}}/>
           <span style={{fontSize:12,color:T.sub}}>%</span>
         </div>
       ))}
-      <button onClick={apply} disabled={!valid} style={{width:"100%",padding:"8px 0",borderRadius:10,border:"none",background:valid?"#B4FF00":T.muted,color:valid?"#fff":T.sub,fontSize:13,fontWeight:700,cursor:valid?"pointer":"not-allowed",marginTop:4}}>
+      <button onClick={apply} disabled={!valid} style={{width:"100%",padding:"8px 0",borderRadius:10,border:"none",background:valid?T.accent:T.muted,color:valid?T.isDark?"#020303":"#fff":T.sub,fontSize:13,fontWeight:700,cursor:valid?"pointer":"not-allowed",marginTop:4}}>
         {valid?"✓ Appliquer":"Total doit être 100%"}
       </button>
     </div>
@@ -523,7 +546,7 @@ function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) 
   const isGoalReached = pct >= 100;
 
   return (
-    <div style={{background:"#080F09",borderRadius:14,padding:"14px 16px",border:`1px solid ${isGoalReached?"#B4FF0060":T.border}`,marginBottom:10,position:"relative"}}>
+    <div style={{background:T.card2,borderRadius:14,padding:"14px 16px",border:`1px solid ${isGoalReached?T.accent+"60":T.border}`,marginBottom:10,position:"relative"}}>
 
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -537,7 +560,7 @@ function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) 
 
       {/* Montants + barre */}
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-        <span style={{fontSize:13,fontWeight:800,color:"#B4FF00"}}>{fmt(fund.current)}</span>
+        <span style={{fontSize:13,fontWeight:800,color:T.accentText}}>{fmt(fund.current)}</span>
         <span style={{fontSize:12,color:T.sub}}>/ {fmt(fund.goal)}</span>
       </div>
       <div style={{height:6,background:T.muted,borderRadius:4,marginBottom:4,overflow:"hidden"}}>
@@ -552,7 +575,7 @@ function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) 
             <input value={addAmt} onChange={e=>setAddAmt(e.target.value)} type="number"
               placeholder={sfDisponible>0?`Max ${fmt(sfDisponible)}`:"Trésorerie épuisée"}
               disabled={sfDisponible<=0}
-              style={{flex:1,padding:"7px 10px",borderRadius:9,border:`1px solid ${errMsg?"#F87171":canAdd?"#B4FF00":T.border}`,background:"#040806",color:sfDisponible>0?T.text:T.sub,fontSize:13,outline:"none"}}/>
+              style={{flex:1,padding:"7px 10px",borderRadius:9,border:`1px solid ${errMsg?"#F87171":canAdd?T.accent:T.border}`,background:T.bg,color:sfDisponible>0?T.text:T.sub,fontSize:13,outline:"none"}}/>
             <button onClick={()=>{ if(!canAdd)return; onAdd(fund.id,inputAmt); setAddAmt(""); }}
               disabled={!canAdd}
               style={{padding:"7px 14px",borderRadius:9,border:"none",background:canAdd?"#B4FF00":T.muted,color:canAdd?"#050607":T.sub,fontSize:12,fontWeight:700,cursor:canAdd?"pointer":"not-allowed"}}>+</button>
@@ -563,48 +586,48 @@ function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) 
 
       {/* Bouton Utiliser */}
       <button onClick={()=>{ setUseAmt(String(fund.current)); setUseLabel(fund.label); setUseModal(true); }}
-        style={{width:"100%",marginTop:pct<100?8:0,padding:"9px 0",borderRadius:10,border:`1px solid ${isGoalReached?"#5FD34A":"#1E3D22"}`,background:isGoalReached?"#0B1A0C":"none",color:isGoalReached?"#5FD34A":"#3A6040",fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+        style={{width:"100%",marginTop:pct<100?8:0,padding:"9px 0",borderRadius:10,border:`1px solid ${isGoalReached?T.green:T.border}`,background:isGoalReached?T.card2:"none",color:isGoalReached?T.green:T.sub,fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
         {isGoalReached ? "🎯 Utiliser ce fond" : "Utiliser partiellement"}
       </button>
 
       {/* Modal Utiliser */}
       {useModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(2,3,3,0.96)",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",padding:"0 0 32px"}}>
-          <div style={{width:"100%",maxWidth:430,background:"#060E08",borderRadius:"20px 20px 0 0",border:"1px solid #1E3D22",padding:"24px 20px 8px"}}>
+          <div style={{width:"100%",maxWidth:430,background:T.card,borderRadius:"20px 20px 0 0",border:`1px solid ${T.border}`,padding:"24px 20px 8px"}}>
 
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
               <span style={{fontSize:22}}>{fund.icon}</span>
               <div>
-                <div style={{fontSize:16,fontWeight:800,color:"#E8FFD4"}}>Utiliser — {fund.label}</div>
-                <div style={{fontSize:12,color:"#3A6040"}}>Disponible dans ce fond : {fmt(fund.current)}</div>
+                <div style={{fontSize:16,fontWeight:800,color:T.text}}>Utiliser — {fund.label}</div>
+                <div style={{fontSize:12,color:T.sub}}>Disponible dans ce fond : {fmt(fund.current)}</div>
               </div>
             </div>
 
             {/* Label dépense */}
-            <div style={{fontSize:10,color:"#3A6040",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>LIBELLÉ DE LA DÉPENSE</div>
+            <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>LIBELLÉ DE LA DÉPENSE</div>
             <input value={useLabel} onChange={e=>setUseLabel(e.target.value)}
-              style={{width:"100%",padding:"10px 12px",borderRadius:10,border:"1px solid #1E3D22",background:"#040806",color:"#E8FFD4",fontSize:14,outline:"none",marginBottom:14,boxSizing:"border-box"}}/>
+              style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:14,outline:"none",marginBottom:14,boxSizing:"border-box"}}/>
 
             {/* Montant */}
-            <div style={{fontSize:10,color:"#3A6040",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>MONTANT À UTILISER</div>
+            <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>MONTANT À UTILISER</div>
             <input type="number" value={useAmt} onChange={e=>setUseAmt(e.target.value)}
-              style={{width:"100%",padding:"10px 12px",borderRadius:10,border:"1px solid #1E3D22",background:"#040806",color:"#B4FF00",fontSize:18,fontWeight:800,outline:"none",marginBottom:14,boxSizing:"border-box"}}/>
+              style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.accentText,fontSize:18,fontWeight:800,outline:"none",marginBottom:14,boxSizing:"border-box"}}/>
 
             {/* Après utilisation */}
-            <div style={{fontSize:10,color:"#3A6040",fontWeight:700,letterSpacing:1.5,marginBottom:8}}>APRÈS UTILISATION</div>
+            <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>APRÈS UTILISATION</div>
             <div style={{display:"flex",gap:8,marginBottom:20}}>
               {[{id:"close",label:"Clôturer ce SF",desc:"Supprimer après utilisation"},{id:"reset",label:"Remettre à zéro",desc:"Recommencer l'épargne"}].map(opt=>(
                 <button key={opt.id} onClick={()=>setAfterAction(opt.id)}
-                  style={{flex:1,padding:"10px 8px",borderRadius:10,border:`1.5px solid ${afterAction===opt.id?"#B4FF00":"#122416"}`,background:afterAction===opt.id?"#0F2010":"#040806",cursor:"pointer",textAlign:"center"}}>
-                  <div style={{fontSize:12,fontWeight:700,color:afterAction===opt.id?"#B4FF00":"#E8FFD4",marginBottom:2}}>{opt.label}</div>
-                  <div style={{fontSize:10,color:"#3A6040"}}>{opt.desc}</div>
+                  style={{flex:1,padding:"10px 8px",borderRadius:10,border:`1.5px solid ${afterAction===opt.id?T.accent:T.border}`,background:afterAction===opt.id?T.card2:T.bg,cursor:"pointer",textAlign:"center"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:afterAction===opt.id?T.accent:T.text,marginBottom:2}}>{opt.label}</div>
+                  <div style={{fontSize:10,color:T.sub}}>{opt.desc}</div>
                 </button>
               ))}
             </div>
 
             <div style={{display:"flex",gap:10,paddingBottom:8}}>
               <button onClick={()=>setUseModal(false)}
-                style={{flex:1,padding:"13px 0",borderRadius:12,border:"1px solid #122416",background:"none",color:"#3A6040",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                style={{flex:1,padding:"13px 0",borderRadius:12,border:`1px solid ${T.border}`,background:"none",color:T.sub,fontSize:14,fontWeight:700,cursor:"pointer"}}>
                 Annuler
               </button>
               <button onClick={()=>{
@@ -784,7 +807,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
       return;
     }
     const TRES = { id:"tresorerie", label:t.tresorerie, color:"#B4FF00", bg:"#141005", system:true };
-    const fullEnvs = [TRES,...envs.map(e=>({...e,bg:"#0A1A0C"}))];
+    const fullEnvs = [TRES,...envs.map(e=>({...e,bg:T.card2}))];
     const irObj = {};
     rules.forEach(r=>{ irObj[r.key]={ label:r.label, icon:r.icon, color:r.color, split:r.split }; });
     const subcats = [{ id:"reserve", label:"Mise en réserve", envelopeId:"tresorerie" }];
@@ -792,18 +815,18 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
     onComplete({ name:pName.trim(), currency, lang, envelopes:fullEnvs, incomeRules:irObj, subcats, imported:null });
   }
 
-  const inp = { width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid #1E3D22",background:"#060E08",color:"#E8FFD4",fontSize:15,outline:"none",boxSizing:"border-box" };
+  const inp = { width:"100%",padding:"12px 14px",borderRadius:12,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:15,outline:"none",boxSizing:"border-box" };
   const Btn = ({active,onClick,children,secondary}) => (
     <button onClick={onClick} disabled={active===false} style={{
       flex:1,padding:"14px 0",borderRadius:14,
       border:secondary?"1px solid #1E3D22":"none",
-      background:secondary?"none":active===false?"#0A1A0C":"#B4FF00",
+      background:secondary?"none":active===false?T.muted:T.accent,
       color:secondary?"#3A6040":active===false?"#3A6040":"#020303",
       fontSize:15,fontWeight:800,cursor:active===false?"not-allowed":"pointer",
     }}>{children}</button>
   );
   const ExBox = ({text}) => (
-    <div style={{background:"#040C06",border:"1px solid #1E3D22",borderRadius:10,padding:"10px 12px",marginBottom:18,fontSize:12,color:"#3A6040",lineHeight:1.6}}>{text}</div>
+    <div style={{background:"#040C06",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 12px",marginBottom:18,fontSize:12,color:"#3A6040",lineHeight:1.6}}>{text}</div>
   );
   const dotSteps = OB_STEPS_CREATE.slice(1);
   const dotIndex = mode==="create" ? step-1 : -1;
@@ -832,17 +855,17 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
               <div style={{fontSize:13,color:"#3A6040",marginBottom:28}}>{t.welcomeSub}</div>
 
               <button onClick={()=>{ setMode("create"); setStep(1); }}
-                style={{width:"100%",padding:"18px 20px",borderRadius:14,border:"1.5px solid #B4FF00",background:"#0B1A0C",cursor:"pointer",textAlign:"left",marginBottom:12,display:"flex",flexDirection:"column",gap:4}}>
-                <div style={{fontSize:15,fontWeight:800,color:"#B4FF00"}}>✦ {t.createNew}</div>
+                style={{width:"100%",padding:"18px 20px",borderRadius:14,border:"1.5px solid #B4FF00",background:T.card2,cursor:"pointer",textAlign:"left",marginBottom:12,display:"flex",flexDirection:"column",gap:4}}>
+                <div style={{fontSize:15,fontWeight:800,color:T.accentText}}>✦ {t.createNew}</div>
                 <div style={{fontSize:12,color:"#3A6040"}}>{t.createNewSub}</div>
               </button>
 
-              <div style={{background:"#060E08",borderRadius:14,padding:"16px 20px",border:"1px solid #122416"}}>
+              <div style={{background:T.card,borderRadius:14,padding:"16px 20px",border:`1px solid ${T.border}`}}>
                 <div style={{fontSize:14,fontWeight:700,color:"#E8FFD4",marginBottom:3}}>{t.importExisting}</div>
                 <div style={{fontSize:12,color:"#3A6040",marginBottom:12}}>{t.importExistingSub}</div>
                 {importedData?(
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{flex:1,padding:"10px 14px",borderRadius:10,background:"#0F2010",border:"1px solid #B4FF0040",color:"#B4FF00",fontSize:13,fontWeight:700}}>
+                    <div style={{flex:1,padding:"10px 14px",borderRadius:10,background:T.card2,border:`1px solid ${T.accent}40`,color:T.accentText,fontSize:13,fontWeight:700}}>
                       ✓ {importedData.profile?.name||"Backup"} — {t.importDoneLabel}
                     </div>
                     <button onClick={()=>{ setMode("import"); setStep(1); }} style={{padding:"10px 16px",borderRadius:10,border:"none",background:"#B4FF00",color:"#020303",fontWeight:800,fontSize:13,cursor:"pointer"}}>
@@ -850,7 +873,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
                     </button>
                   </div>
                 ):(
-                  <label style={{display:"block",padding:"11px 0",borderRadius:12,border:"1.5px dashed #1E3D22",background:"#040806",color:"#3A6040",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
+                  <label style={{display:"block",padding:"11px 0",borderRadius:12,border:"1.5px dashed #1E3D22",background:T.bg,color:"#3A6040",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
                     {t.importBtn}
                     <input type="file" accept="application/json" style={{display:"none"}} onChange={e=>handleImportFile(e.target.files[0])}/>
                   </label>
@@ -877,8 +900,8 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
               <div style={{fontSize:13,color:"#3A6040",marginBottom:20}}>{t.langSub}</div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {Object.entries(LANGS).map(([code,label])=>(
-                  <button key={code} onClick={()=>setLang(code)} style={{padding:"14px 16px",borderRadius:12,border:`1.5px solid ${lang===code?"#B4FF00":"#122416"}`,background:lang===code?"#0F2010":"#060E08",color:lang===code?"#B4FF00":"#E8FFD4",fontSize:15,fontWeight:lang===code?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    {label}{lang===code&&<span style={{color:"#B4FF00"}}>✓</span>}
+                  <button key={code} onClick={()=>setLang(code)} style={{padding:"14px 16px",borderRadius:12,border:`1.5px solid ${lang===code?T.accent:T.border}`,background:lang===code?T.card2:T.card,color:lang===code?T.accent:T.text,fontSize:15,fontWeight:lang===code?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    {label}{lang===code&&<span style={{color:T.accentText}}>✓</span>}
                   </button>
                 ))}
               </div>
@@ -902,8 +925,8 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
               <ExBox text={t.currencyEx}/>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {CURRENCIES.map(c=>(
-                  <button key={c.code} onClick={()=>setCur(c.code)} style={{padding:"13px 16px",borderRadius:12,border:`1.5px solid ${currency===c.code?"#B4FF00":"#122416"}`,background:currency===c.code?"#0F2010":"#060E08",color:currency===c.code?"#B4FF00":"#E8FFD4",fontSize:13,fontWeight:currency===c.code?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    {c.label}{currency===c.code&&<span style={{color:"#B4FF00"}}>✓</span>}
+                  <button key={c.code} onClick={()=>setCur(c.code)} style={{padding:"13px 16px",borderRadius:12,border:`1.5px solid ${currency===c.code?T.accent:T.border}`,background:currency===c.code?T.card2:T.card,color:currency===c.code?T.accent:T.text,fontSize:13,fontWeight:currency===c.code?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    {c.label}{currency===c.code&&<span style={{color:T.accentText}}>✓</span>}
                   </button>
                 ))}
               </div>
@@ -915,9 +938,9 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
               <div style={{fontSize:22,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.envelopes}</div>
               <div style={{fontSize:13,color:"#3A6040",marginBottom:12}}>{t.envelopesSub}</div>
               <ExBox text={t.envelopesEx}/>
-              <div style={{padding:"11px 14px",borderRadius:12,border:"1px solid #B4FF0030",background:"#0F2010",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{padding:"11px 14px",borderRadius:12,border:"1px solid #B4FF0030",background:T.card2,marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:10,height:10,borderRadius:"50%",background:"#B4FF00",flexShrink:0}}/>
-                <span style={{fontSize:14,color:"#B4FF00",fontWeight:700,flex:1}}>{t.tresorerie}</span>
+                <span style={{fontSize:14,color:T.accentText,fontWeight:700,flex:1}}>{t.tresorerie}</span>
                 <span style={{fontSize:10,color:"#3A6040",fontWeight:700}}>{t.system_label}</span>
               </div>
               {envs.map((e,i)=>(
@@ -957,7 +980,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
                     </div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
                       {items.map((lbl,li)=>(
-                        <div key={li} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:20,background:"#060E08",border:"1px solid #1E3D22"}}>
+                        <div key={li} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:20,background:T.card,border:`1px solid ${T.border}`}}>
                           <span style={{fontSize:12,color:"#E8FFD4"}}>{lbl}</span>
                           <button onClick={()=>setSubcatMap(m=>({...m,[e.id]:items.filter((_,j)=>j!==li)}))}
                             style={{background:"none",border:"none",color:"#F87171",cursor:"pointer",padding:0,fontSize:13,lineHeight:1}}>×</button>
@@ -987,7 +1010,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
                 const total=allE.reduce((a,e)=>a+(parseFloat(r.split[e.id])||0),0);
                 const valid=Math.round(total)===100;
                 return (
-                  <div key={r.key} style={{background:"#060E08",borderRadius:14,padding:"14px",border:`1.5px solid ${valid?"#B4FF0040":"#122416"}`,marginBottom:12}}>
+                  <div key={r.key} style={{background:T.card,borderRadius:14,padding:"14px",border:`1.5px solid ${valid?"#B4FF0040":"#122416"}`,marginBottom:12}}>
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
                       <span style={{fontSize:20}}>{r.icon}</span>
                       <input value={r.label} onChange={e=>setRules(p=>p.map((x,i)=>i===ri?{...x,label:e.target.value}:x))}
@@ -1001,7 +1024,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
                         <span style={{fontSize:13,color:"#E8FFD4",flex:1}}>{e.label}</span>
                         <input type="number" min="0" max="100" value={r.split[e.id]??0}
                           onChange={ev=>setRules(p=>p.map((x,i)=>i===ri?{...x,split:{...x.split,[e.id]:ev.target.value}}:x))}
-                          style={{width:52,padding:"4px 8px",borderRadius:8,border:"1px solid #122416",background:"#040806",color:"#E8FFD4",fontSize:13,fontWeight:700,outline:"none",textAlign:"center"}}/>
+                          style={{width:52,padding:"4px 8px",borderRadius:8,border:`1px solid ${T.border}`,background:T.bg,color:"#E8FFD4",fontSize:13,fontWeight:700,outline:"none",textAlign:"center"}}/>
                         <span style={{fontSize:12,color:"#3A6040"}}>%</span>
                       </div>
                     ))}
@@ -1009,7 +1032,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
                 );
               })}
               <button onClick={()=>setRules(p=>[...p,{key:uid(),label:"Nouveau revenu",icon:"💰",color:"#F472B6",split:makeDefaultSplit()}])}
-                style={{width:"100%",padding:"11px 0",borderRadius:12,border:"1px solid #122416",background:"#060E08",color:"#3A6040",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:4}}>
+                style={{width:"100%",padding:"11px 0",borderRadius:12,border:`1px solid ${T.border}`,background:T.card,color:"#3A6040",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:4}}>
                 {t.revenuesAdd}
               </button>
             </>
@@ -1040,7 +1063,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
 }
 
 // ─── PROFILE SETTINGS OVERLAY ────────────────────────────────────────────────
-function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, setSeuils, onClose }) {
+function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, setSeuils, onToggleTheme, onClose }) {
   const ps_cur    = pload(ps_pid, "currency", "Ar");
   const ps_lang   = pload(ps_pid, "lang", "fr");
   const ps_seuils = pload(ps_pid, SEUILS_KEY, { alerte:60000, blocage:25000 });
@@ -1076,22 +1099,23 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
   const cur_cur    = pload(ps_pid, "currency", "Ar");
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(2,3,3,0.97)",zIndex:400,display:"flex",flexDirection:"column",maxWidth:430,margin:"0 auto"}}>
+    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:400,display:"flex",flexDirection:"column",maxWidth:430,margin:"0 auto"}}>
       <div style={{padding:"52px 20px 20px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div style={{fontSize:18,fontWeight:800,color:T.text}}>⚙ {profileName}</div>
         <button onClick={onClose} style={{background:"none",border:"none",color:T.sub,fontSize:24,cursor:"pointer"}}>×</button>
       </div>
       <div style={{flex:1,overflowY:"auto",padding:"20px"}}>
 
-        {/* LANGUE */}
-        <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>LANGUE</div>
-        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:24}}>
-          {Object.entries(LANGS).map(([code,label])=>{
-            const active = cur_lang===code;
+        {/* THÈME */}
+        <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>APPARENCE</div>
+        <div style={{display:"flex",gap:8,marginBottom:24}}>
+          {[{id:true,label:"🌑 Sombre",desc:"Mode nuit"},{id:false,label:"☀️ Clair",desc:"Mode jour"}].map(opt=>{
+            const active = T.isDark===opt.id;
             return (
-              <button key={code} onClick={()=>saveLang(code)}
-                style={{padding:"12px 16px",borderRadius:12,border:`1.5px solid ${active?"#B4FF00":T.border}`,background:active?"#0F2010":T.card,color:active?"#B4FF00":T.text,fontSize:14,fontWeight:active?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between"}}>
-                {label}{active&&<span style={{color:"#B4FF00"}}>✓</span>}
+              <button key={String(opt.id)} onClick={()=>{ if(ps_pid===pid) onToggleTheme(); }}
+                style={{flex:1,padding:"12px 10px",borderRadius:12,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.card2:T.card,color:active?T.accent:T.text,fontSize:13,fontWeight:active?700:500,cursor:"pointer",textAlign:"center"}}>
+                <div style={{fontSize:15,marginBottom:2}}>{opt.label}</div>
+                <div style={{fontSize:10,color:T.sub}}>{opt.desc}</div>
               </button>
             );
           })}
@@ -1111,7 +1135,7 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
                 psave(ps_pid,"coussin",v);
                 if(ps_pid===pid) setCoussin(v);
               }}
-              style={{flex:1,padding:"10px 12px",borderRadius:10,border:"1px solid #1E3D22",background:"#040806",color:"#B4FF00",fontSize:16,fontWeight:800,outline:"none"}}/>
+              style={{flex:1,padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.accentText,fontSize:16,fontWeight:800,outline:"none"}}/>
             <span style={{fontSize:13,color:"#3A6040",fontWeight:600}}>{pload(ps_pid,"currency","Ar")}</span>
           </div>
           <div style={{fontSize:11,color:"#1E3D22",marginTop:8}}>Idéalement = 3 mois de dépenses de survie</div>
@@ -1124,10 +1148,10 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
             const active = cur_seuils.presetId===preset.id;
             return (
               <button key={preset.id} onClick={()=>savePreset(preset)}
-                style={{padding:"12px 14px",borderRadius:12,border:`1.5px solid ${active?"#B4FF00":T.border}`,background:active?"#0F2010":T.card,cursor:"pointer",textAlign:"left"}}>
+                style={{padding:"12px 14px",borderRadius:12,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.card2:T.card,cursor:"pointer",textAlign:"left"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                  <span style={{fontSize:13,fontWeight:700,color:active?"#B4FF00":T.text}}>{preset.emoji} {preset.label}</span>
-                  {active&&<span style={{color:"#B4FF00",fontSize:12}}>✓</span>}
+                  <span style={{fontSize:13,fontWeight:700,color:active?T.accentText:T.text}}>{preset.emoji} {preset.label}</span>
+                  {active&&<span style={{color:T.accentText,fontSize:12}}>✓</span>}
                 </div>
                 <div style={{fontSize:11,color:"#3A6040",marginBottom:6}}>{preset.desc}</div>
                 <div style={{display:"flex",gap:12}}>
@@ -1138,18 +1162,18 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
             );
           })}
           {/* Personnalisé */}
-          <div style={{padding:"12px 14px",borderRadius:12,border:`1.5px solid ${cur_seuils.presetId==="custom"?"#B4FF00":T.border}`,background:cur_seuils.presetId==="custom"?"#0F2010":T.card}}>
-            <div style={{fontSize:13,fontWeight:700,color:cur_seuils.presetId==="custom"?"#B4FF00":T.text,marginBottom:10}}>✏️ Personnalisé</div>
+          <div style={{padding:"12px 14px",borderRadius:12,border:`1.5px solid ${cur_seuils.presetId==="custom"?T.accent:T.border}`,background:cur_seuils.presetId==="custom"?T.card2:T.card}}>
+            <div style={{fontSize:13,fontWeight:700,color:cur_seuils.presetId==="custom"?T.accentText:T.text,marginBottom:10}}>✏️ Personnalisé</div>
             <div style={{display:"flex",gap:8,marginBottom:10}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:10,color:"#FBBF24",fontWeight:700,marginBottom:4}}>🟡 ALERTE</div>
                 <input type="number" value={custA} onChange={e=>setCustA(e.target.value)}
-                  style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #1E3D22",background:"#040806",color:T.text,fontSize:13,outline:"none"}}/>
+                  style={{width:"100%",padding:"8px 10px",borderRadius:8,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:13,outline:"none"}}/>
               </div>
               <div style={{flex:1}}>
                 <div style={{fontSize:10,color:"#F87171",fontWeight:700,marginBottom:4}}>🔴 BLOCAGE</div>
                 <input type="number" value={custB} onChange={e=>setCustB(e.target.value)}
-                  style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #1E3D22",background:"#040806",color:T.text,fontSize:13,outline:"none"}}/>
+                  style={{width:"100%",padding:"8px 10px",borderRadius:8,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:13,outline:"none"}}/>
               </div>
             </div>
             <button onClick={saveCustom}
@@ -1166,8 +1190,8 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
             const active = cur_cur===c.code;
             return (
               <button key={c.code} onClick={()=>saveCurrency(c.code)}
-                style={{padding:"12px 16px",borderRadius:12,border:`1.5px solid ${active?"#B4FF00":T.border}`,background:active?"#0F2010":T.card,color:active?"#B4FF00":T.text,fontSize:13,fontWeight:active?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between"}}>
-                {c.label}{active&&<span style={{color:"#B4FF00"}}>✓</span>}
+                style={{padding:"12px 16px",borderRadius:12,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.card2:T.card,color:active?"#B4FF00":T.text,fontSize:13,fontWeight:active?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between"}}>
+                {c.label}{active&&<span style={{color:T.accentText}}>✓</span>}
               </button>
             );
           })}
@@ -1194,7 +1218,7 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(2,3,3,0.96)",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",padding:"0 0 32px"}}>
-      <div style={{width:"100%",maxWidth:430,background:"#060E08",borderRadius:"20px 20px 0 0",border:"1px solid #1E3D22",padding:"24px 20px 8px"}}>
+      <div style={{width:"100%",maxWidth:430,background:T.card,borderRadius:"20px 20px 0 0",border:`1px solid ${T.border}`,padding:"24px 20px 8px"}}>
 
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
           <span style={{fontSize:22}}>⚠️</span>
@@ -1204,22 +1228,22 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
           </div>
         </div>
 
-        <div style={{background:"#040806",borderRadius:12,padding:"12px 14px",marginBottom:16}}>
+        <div style={{background:T.card2,borderRadius:12,padding:"12px 14px",marginBottom:16}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-            <span style={{fontSize:12,color:"#3A6040"}}>Dépense</span>
-            <span style={{fontSize:13,fontWeight:700,color:"#E8FFD4"}}>{fmt(amt)}</span>
+            <span style={{fontSize:12,color:T.sub}}>Dépense</span>
+            <span style={{fontSize:13,fontWeight:700,color:T.text}}>{fmt(amt)}</span>
           </div>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-            <span style={{fontSize:12,color:"#3A6040"}}>Solde {envLabel}</span>
+            <span style={{fontSize:12,color:T.sub}}>Solde {envLabel}</span>
             <span style={{fontSize:13,fontWeight:700,color:"#F87171"}}>{fmt(currentBal)}</span>
           </div>
-          <div style={{borderTop:"1px solid #122416",paddingTop:6,display:"flex",justifyContent:"space-between"}}>
-            <span style={{fontSize:12,color:"#3A6040"}}>Manque</span>
+          <div style={{borderTop:`1px solid ${T.border}`,paddingTop:6,display:"flex",justifyContent:"space-between"}}>
+            <span style={{fontSize:12,color:T.sub}}>Manque</span>
             <span style={{fontSize:14,fontWeight:800,color:"#F87171"}}>{fmt(shortage)}</span>
           </div>
         </div>
 
-        <div style={{fontSize:11,fontWeight:700,color:"#3A6040",letterSpacing:1.5,marginBottom:10}}>
+        <div style={{fontSize:11,fontWeight:700,color:T.sub,letterSpacing:1.5,marginBottom:10}}>
           COUVRIR LE MANQUE DEPUIS
         </div>
 
@@ -1236,7 +1260,7 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
               const canCover = Math.min(shortage, eBal);
               return (
                 <button key={e.id} onClick={()=>setSelectedFallback(active?null:e.id)}
-                  style={{padding:"11px 14px",borderRadius:12,border:`1.5px solid ${active?e.color:"#122416"}`,background:active?"#0B1A0C":"#040806",cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  style={{padding:"11px 14px",borderRadius:12,border:`1.5px solid ${active?e.color:"#122416"}`,background:active?T.card2:T.bg,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <div style={{width:8,height:8,borderRadius:"50%",background:e.color}}/>
                     <span style={{fontSize:13,fontWeight:700,color:active?e.color:"#E8FFD4"}}>{e.label}</span>
@@ -1252,17 +1276,17 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
         )}
 
         {selectedFallback&&(
-          <div style={{background:"#040806",borderRadius:12,padding:"12px 14px",marginBottom:16,border:"1px solid #1E3D22"}}>
+          <div style={{background:T.card2,borderRadius:12,padding:"12px 14px",marginBottom:16,border:`1px solid ${T.border}`}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:12,color:"#3A6040"}}>{envLabel} après</span>
+              <span style={{fontSize:12,color:T.sub}}>{envLabel} après</span>
               <span style={{fontSize:13,fontWeight:700,color:"#F87171"}}>{fmt(currentBal-amt)}</span>
             </div>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:12,color:"#3A6040"}}>{envelopes.find(e=>e.id===selectedFallback)?.label} après</span>
-              <span style={{fontSize:13,fontWeight:700,color:"#E8FFD4"}}>{fmt(fallbackBal-covered)}</span>
+              <span style={{fontSize:12,color:T.sub}}>{envelopes.find(e=>e.id===selectedFallback)?.label} après</span>
+              <span style={{fontSize:13,fontWeight:700,color:T.text}}>{fmt(fallbackBal-covered)}</span>
             </div>
             {remaining>0&&(
-              <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid #122416",paddingTop:6}}>
+              <div style={{display:"flex",justifyContent:"space-between",borderTop:`1px solid ${T.border}`,paddingTop:6}}>
                 <span style={{fontSize:11,color:"#F87171"}}>Reste en négatif</span>
                 <span style={{fontSize:12,fontWeight:700,color:"#F87171"}}>{fmt(remaining)}</span>
               </div>
@@ -1272,7 +1296,7 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
 
         <div style={{display:"flex",gap:10,paddingBottom:8}}>
           <button onClick={onCancel}
-            style={{flex:1,padding:"13px 0",borderRadius:12,border:"1px solid #122416",background:"none",color:"#3A6040",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+            style={{flex:1,padding:"13px 0",borderRadius:12,border:`1px solid ${T.border}`,background:"none",color:"#3A6040",fontSize:14,fontWeight:700,cursor:"pointer"}}>
             Annuler
           </button>
           <button onClick={()=>onConfirm(selectedFallback)}
@@ -1289,6 +1313,15 @@ export default function App() {
   const isDesktop = useIsDesktop();
   const [unlocked, setUnlocked] = useState(() => load(UNLOCKED_KEY, false));
   const [showChangePin, setShowChangePin] = useState(false);
+
+  // ── Theme ────────────────────────────────────────────────────────────────────
+  const [isDark, setIsDark] = useState(() => load(THEME_KEY, true));
+  T = isDark ? DARK_THEME : LIGHT_THEME; // update global reference each render
+  function toggleTheme() {
+    const next = !isDark;
+    setIsDark(next);
+    save(THEME_KEY, next);
+  }
 
   const [swStatus, setSwStatus] = useState("checking");
   const [swDebug, setSwDebug] = useState(null);
@@ -1622,7 +1655,7 @@ export default function App() {
 
   let sColor="#34D399",sBg="#061510",sMsg="✅ Situation stable";
   if(disponible<=SEUILS.blocage){sColor="#F87171";sBg="#1A0808";sMsg="🔴 Blocage — Survie uniquement";}
-  else if(disponible<=SEUILS.alerte){sColor="#B4FF00";sBg="#141005";sMsg="🟡 Alerte — Relancer un client";}
+  else if(disponible<=SEUILS.alerte){sColor=T.accentText;sBg=T.isDark?"#141005":T.card2;sMsg="🟡 Alerte — Relancer un client";}
 
   // ── Coussin sécurité Trésorerie ──────────────────────────────────────────────
   const COUSSIN_KEY = "coussin";
@@ -1865,8 +1898,8 @@ export default function App() {
           return (
             <div key={key} style={{marginBottom:8}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontSize:12,color:"#CBD5E1",fontWeight:600}}>● <span style={{color:env.color}}>{env.label}</span> {pct}%</span>
-                <span style={{fontSize:12,fontWeight:800,color:env.color}}>{fmt(amt*pct/100)}</span>
+                <span style={{fontSize:12,color:"#CBD5E1",fontWeight:600}}>● <span style={{color:envTextColor(env.color)}}>{env.label}</span> {pct}%</span>
+                <span style={{fontSize:12,fontWeight:800,color:envTextColor(env.color)}}>{fmt(amt*pct/100)}</span>
               </div>
               <div style={{height:3,background:T.muted,borderRadius:4}}><div style={{height:"100%",width:pct+"%",background:env.color,borderRadius:4}}/></div>
             </div>
@@ -1896,11 +1929,11 @@ export default function App() {
   }
 
   return (
-    <div style={{fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif",background:T.bg,minHeight:"100vh",color:T.text,display:"flex"}}>
+    <div style={{fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif",background:T.bg,minHeight:"100vh",color:T.text,display:"flex",transition:"background .2s,color .2s"}}>
 
       {/* ══ DESKTOP SIDEBAR ═══════════════════════════════════════════════════ */}
       {isDesktop && (
-        <div style={{width:220,flexShrink:0,height:"100vh",position:"sticky",top:0,background:"#060E08",borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",padding:"28px 16px"}}>
+        <div style={{width:220,flexShrink:0,height:"100vh",position:"sticky",top:0,background:T.card,borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",padding:"28px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:32,padding:"0 8px"}}>
             <div style={{width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,#B4FF00,#5FD34A)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:"#020303",flexShrink:0}}>K</div>
             <div style={{fontSize:15,fontWeight:800,color:T.text}}>Kajy</div>
@@ -1909,10 +1942,10 @@ export default function App() {
           {NAV_ITEMS.filter(t=>!t.big).map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{
               display:"flex",alignItems:"center",gap:12,padding:"11px 12px",borderRadius:12,border:"none",cursor:"pointer",
-              background:tab===t.id?"#0B1A12":"transparent",color:tab===t.id?"#B4FF00":T.sub,marginBottom:4,position:"relative",
+              background:tab===t.id?T.card2:"transparent",color:tab===t.id?T.accentText:T.sub,marginBottom:4,position:"relative",
               fontSize:14,fontWeight:tab===t.id?700:500,textAlign:"left",
             }}>
-              {t.svg(tab===t.id?"#B4FF00":T.sub)}
+              {t.svg(tab===t.id?T.accentText:T.sub)}
               {t.label}
               {t.id==="recurring"&&recurExp.some(r=>r.active&&daysUntil(r.nextDate)<=3)&&(
                 <span style={{position:"absolute",top:8,right:10,width:6,height:6,borderRadius:"50%",background:"#F87171"}}/>
@@ -1927,7 +1960,7 @@ export default function App() {
 
           <div style={{flex:1}}/>
 
-          <button onClick={()=>setShowP(true)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:"#040806",cursor:"pointer",color:T.text}}>
+          <button onClick={()=>setShowP(true)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,cursor:"pointer",color:T.text}}>
             <div style={{width:26,height:26,borderRadius:8,background:"#B4FF00",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#020303",flexShrink:0}}>{activeProfile.name[0].toUpperCase()}</div>
             <span style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{activeProfile.name}</span>
           </button>
@@ -1940,7 +1973,7 @@ export default function App() {
       {/* ══ HOME ══════════════════════════════════════════════════════════════ */}
       {/* ══ PROFILE SWITCHER OVERLAY ═════════════════════════════════════════ */}
       {showProfiles&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(2,3,3,0.95)",zIndex:200,display:"flex",flexDirection:"column",maxWidth:430,margin:"0 auto"}}>
+        <div style={{position:"fixed",inset:0,background:T.isDark?"rgba(2,3,3,0.97)":"rgba(245,247,242,0.98)",zIndex:200,display:"flex",flexDirection:"column",maxWidth:430,margin:"0 auto"}}>
           <div style={{padding:"52px 20px 20px",borderBottom:`1px solid ${T.border}`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
               <div style={{fontSize:22,fontWeight:800,color:T.text}}>Profils</div>
@@ -1951,9 +1984,9 @@ export default function App() {
           <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
             {profiles.map(p=>(
               <div key={p.id}>
-                <div onClick={()=>switchProfile(p.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",background:activeId===p.id?"#0A1A0C":T.card,borderRadius:14,marginBottom:4,border:`1.5px solid ${activeId===p.id?"#B4FF00":T.border}`,cursor:"pointer"}}>
-                  <div style={{width:40,height:40,borderRadius:12,background:activeId===p.id?"#B4FF00":"#0F2415",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                    <span style={{fontSize:16,fontWeight:800,color:activeId===p.id?"#020303":"#B4FF00"}}>{p.name[0].toUpperCase()}</span>
+                <div onClick={()=>switchProfile(p.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",background:activeId===p.id?T.card2:T.card,borderRadius:14,marginBottom:4,border:`1.5px solid ${activeId===p.id?T.accent:T.border}`,cursor:"pointer"}}>
+                  <div style={{width:40,height:40,borderRadius:12,background:activeId===p.id?T.accent:T.card2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                    <span style={{fontSize:16,fontWeight:800,color:activeId===p.id?T.isDark?"#020303":"#fff":T.accentText}}>{p.name[0].toUpperCase()}</span>
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     {editingProfile===p.id?(
@@ -1962,13 +1995,13 @@ export default function App() {
                         onBlur={()=>{ renameProfile(p.id, editingPName); setEP(null); }}
                         onKeyDown={e=>{ if(e.key==="Enter") e.target.blur(); }}
                         autoFocus
-                        style={{width:"100%",padding:"3px 6px",borderRadius:6,border:`1px solid #B4FF0060`,background:"#040806",color:T.text,fontSize:15,fontWeight:700,outline:"none",boxSizing:"border-box"}}/>
+                        style={{width:"100%",padding:"3px 6px",borderRadius:6,border:`1px solid #B4FF0060`,background:T.bg,color:T.text,fontSize:15,fontWeight:700,outline:"none",boxSizing:"border-box"}}/>
                     ):(
-                      <div style={{fontSize:15,fontWeight:700,color:activeId===p.id?"#B4FF00":T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                      <div style={{fontSize:15,fontWeight:700,color:activeId===p.id?T.accentText:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
                     )}
                     <div style={{fontSize:11,color:T.sub}}>{activeId===p.id?"Actif":"Appuyer pour switcher"}</div>
                   </div>
-                  {activeId===p.id&&<span style={{color:"#B4FF00",fontSize:18,flexShrink:0}}>✓</span>}
+                  {activeId===p.id&&<span style={{color:T.accentText,fontSize:18,flexShrink:0}}>✓</span>}
 
                   {/* Rename icon */}
                   <button onClick={e=>{e.stopPropagation(); setEP(p.id); setEPN(p.name);}} title="Renommer" style={{background:"none",border:"none",color:T.sub,cursor:"pointer",padding:6,flexShrink:0,display:"flex"}}>
@@ -2004,7 +2037,7 @@ export default function App() {
                   )}
                 </div>
                 {importMsg&&p.id===activeId&&(
-                  <div style={{fontSize:11,color:importMsg.startsWith("✓")?"#B4FF00":"#F87171",marginBottom:10,paddingLeft:4,fontWeight:600}}>{importMsg}</div>
+                  <div style={{fontSize:11,color:importMsg.startsWith("✓")?T.accentText:"#F87171",marginBottom:10,paddingLeft:4,fontWeight:600}}>{importMsg}</div>
                 )}
               </div>
             ))}
@@ -2013,7 +2046,7 @@ export default function App() {
               <div style={{fontSize:11,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>NOUVEAU PROFIL</div>
               <div style={{display:"flex",gap:8}}>
                 <input value={newPName} onChange={e=>setNPN(e.target.value)} placeholder="Nom du profil (ex: Famille)"
-                  style={{flex:1,padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:"#040806",color:T.text,fontSize:14,outline:"none"}}
+                  style={{flex:1,padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:14,outline:"none"}}
                   onKeyDown={e=>e.key==="Enter"&&createProfile()}/>
                 <button onClick={createProfile} style={{padding:"10px 16px",borderRadius:10,border:"none",background:"#B4FF00",color:"#020303",fontSize:14,fontWeight:800,cursor:"pointer"}}>+</button>
               </div>
@@ -2022,12 +2055,12 @@ export default function App() {
 
           {/* Bottom-right lock controls */}
           <div style={{position:"absolute",bottom:20,right:20,display:"flex",gap:8}}>
-            <button onClick={()=>setShowChangePin(true)} title="Changer le code" style={{width:40,height:40,borderRadius:12,border:`1px solid #B4FF0060`,background:"#0B1A1240",color:"#B4FF00",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <button onClick={()=>setShowChangePin(true)} title="Changer le code" style={{width:40,height:40,borderRadius:12,border:`1px solid ${T.accent}60`,background:T.card2+"40",color:T.accentText,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="16" r="1"/><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
               </svg>
             </button>
-            <button onClick={()=>{ save(UNLOCKED_KEY,false); setUnlocked(false); }} title="Verrouiller" style={{width:40,height:40,borderRadius:12,border:`1px solid ${T.border}`,background:"#040806",color:T.sub,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <button onClick={()=>{ save(UNLOCKED_KEY,false); setUnlocked(false); }} title="Verrouiller" style={{width:40,height:40,borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.sub,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
               </svg>
@@ -2051,6 +2084,7 @@ export default function App() {
               setLang={setLang}
               setCurrency={setCurrency}
               setSeuils={setSeuils}
+              onToggleTheme={toggleTheme}
               onClose={()=>setProfSettings(null)}
             />
           )}
@@ -2059,10 +2093,10 @@ export default function App() {
 
       {tab==="home"&&(
         <div style={{flex:1,overflowY:"auto",paddingBottom:90}}>
-          <div style={{background:"linear-gradient(160deg,#060E08,#020303)",padding:"52px 20px 24px",borderBottom:`1px solid ${T.border}`}}>
+          <div style={{background:T.isDark?"linear-gradient(160deg,#060E08,#020303)":"linear-gradient(160deg,#EEF3E8,#F5F7F2)",padding:"52px 20px 24px",borderBottom:`1px solid ${T.border}`}}>
             {/* Profile switcher button */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-              <button onClick={()=>setShowP(true)} style={{display:"flex",alignItems:"center",gap:8,background:"#0A1A0C",border:`1px solid ${T.border}`,borderRadius:20,padding:"5px 12px 5px 6px",cursor:"pointer"}}>
+              <button onClick={()=>setShowP(true)} style={{display:"flex",alignItems:"center",gap:8,background:T.card2,border:`1px solid ${T.border}`,borderRadius:20,padding:"5px 12px 5px 6px",cursor:"pointer"}}>
                 <div style={{width:24,height:24,borderRadius:8,background:"#B4FF00",display:"flex",alignItems:"center",justifyContent:"center"}}>
                   <span style={{fontSize:12,fontWeight:800,color:"#020303"}}>{activeProfile?.name[0].toUpperCase()}</span>
                 </div>
@@ -2073,8 +2107,8 @@ export default function App() {
             </div>
 
             <div style={{fontSize:11,color:T.sub,letterSpacing:2,fontWeight:700,marginBottom:6}}>SOLDE DISPONIBLE</div>
-            <div style={{fontSize:46,fontWeight:900,letterSpacing:-2,lineHeight:1,marginBottom:6,color:disponible<=SEUILS.blocage?"#F87171":disponible<=SEUILS.alerte?"#B4FF00":T.text}}>{fmt(disponible)}</div>
-            <div style={{fontSize:13,color:T.sub}}>Trésorerie : <span style={{color:"#B4FF00",fontWeight:700}}>{fmt(bal.tresorerie||0)}</span></div>
+            <div style={{fontSize:46,fontWeight:900,letterSpacing:-2,lineHeight:1,marginBottom:6,color:disponible<=SEUILS.blocage?"#F87171":disponible<=SEUILS.alerte?T.accentText:T.text}}>{fmt(disponible)}</div>
+            <div style={{fontSize:13,color:T.sub}}>Trésorerie : <span style={{color:T.accentText,fontWeight:700}}>{fmt(bal.tresorerie||0)}</span></div>
           </div>
           <div style={{padding:"16px 16px 0"}}>
             {disponible<=SEUILS.alerte&&(
@@ -2085,12 +2119,12 @@ export default function App() {
             )}
 
             {/* Chart */}
-            <div style={{background:"#060E08",borderRadius:16,padding:"16px",marginBottom:20,border:`1px solid ${T.border}`}}>
+            <div style={{background:T.card,borderRadius:16,padding:"16px",marginBottom:20,border:`1px solid ${T.border}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                 <div style={{fontSize:13,fontWeight:700,color:T.text}}>Évolution du solde</div>
                 <div style={{display:"flex",gap:4}}>
                   {[["week","7j"],["month","30j"],["year","1an"]].map(([id,lbl])=>(
-                    <button key={id} onClick={()=>setCP(id)} style={{padding:"4px 8px",borderRadius:8,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:chartPeriod===id?"#B4FF00":"#080F09",color:chartPeriod===id?"#fff":T.sub}}>{lbl}</button>
+                    <button key={id} onClick={()=>setCP(id)} style={{padding:"4px 8px",borderRadius:8,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:chartPeriod===id?T.accent:T.muted,color:chartPeriod===id?T.isDark?"#020303":"#fff":T.sub}}>{lbl}</button>
                   ))}
                 </div>
               </div>
@@ -2099,7 +2133,7 @@ export default function App() {
 
             {/* Envelopes with progress bars — trésorerie excluded */}
             <div style={{fontSize:11,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>ENVELOPPES</div>
-            <div style={{background:"#060E08",borderRadius:16,overflow:"hidden",marginBottom:16,border:`1px solid ${T.border}`}}>
+            <div style={{background:T.card,borderRadius:16,overflow:"hidden",marginBottom:16,border:`1px solid ${T.border}`}}>
               {envelopes.filter(e=>e.id!=="tresorerie").map((env,i,arr)=>(
                 <div key={env.id} style={{borderBottom:i<arr.length-1?`1px solid ${T.border}`:undefined}}>
                   <EnvBar env={env} balance={bal[env.id]||0} maxBalance={envMax[env.id]||bal[env.id]||0}/>
@@ -2116,11 +2150,11 @@ export default function App() {
                   <>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                       <div>
-                        <div style={{fontSize:14,fontWeight:700,color:"#B4FF00"}}>🟡 Trésorerie</div>
+                        <div style={{fontSize:14,fontWeight:700,color:T.accentText}}>🟡 Trésorerie</div>
                         <div style={{fontSize:11,color:T.sub,marginTop:2}}>Réserve intouchable</div>
                       </div>
                       <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                        <div style={{fontSize:20,fontWeight:900,color:"#B4FF00"}}>{fmt(bal.tresorerie||0)}</div>
+                        <div style={{fontSize:20,fontWeight:900,color:T.accentText}}>{fmt(bal.tresorerie||0)}</div>
                         {(bal.tresorerie||0) >= coussin ? (
                           <button onClick={()=>setUrgencyModal({step:"confirm",amt:"",label:"",pinInput:"",pinError:false})}
                             style={{padding:"4px 10px",borderRadius:8,border:"1px solid #2A1010",background:"#0D0404",color:"#F87171",fontSize:10,fontWeight:700,cursor:"pointer",letterSpacing:.5}}>
@@ -2128,21 +2162,21 @@ export default function App() {
                           </button>
                         ) : (
                           <div title={`Coussin min : ${fmt(coussin)}`}
-                            style={{padding:"4px 10px",borderRadius:8,border:"1px solid #122416",background:"#040806",color:"#1E3D22",fontSize:10,fontWeight:700,letterSpacing:.5,cursor:"not-allowed"}}>
+                            style={{padding:"4px 10px",borderRadius:8,border:`1px solid ${T.border}`,background:T.bg,color:"#1E3D22",fontSize:10,fontWeight:700,letterSpacing:.5,cursor:"not-allowed"}}>
                             🚨 Urgence
                           </div>
                         )}
                       </div>
                     </div>
                     {sinkFunds.length>0&&(
-                      <div style={{background:"#040806",borderRadius:10,padding:"10px 12px",marginBottom:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <div style={{background:T.bg,borderRadius:10,padding:"10px 12px",marginBottom:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                         <div>
                           <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1,marginBottom:2}}>ALLOUÉ SF</div>
                           <div style={{fontSize:14,fontWeight:800,color:"#F87171"}}>{fmt(totalAlloue)}</div>
                         </div>
                         <div>
                           <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1,marginBottom:2}}>DISPONIBLE SF</div>
-                          <div style={{fontSize:14,fontWeight:800,color:sfDispo>0?"#B4FF00":T.sub}}>{fmt(sfDispo)}</div>
+                          <div style={{fontSize:14,fontWeight:800,color:sfDispo>0?T.accentText:T.sub}}>{fmt(sfDispo)}</div>
                         </div>
                       </div>
                     )}
@@ -2159,7 +2193,7 @@ export default function App() {
                   })}
                 </div>
               )}
-              <button onClick={()=>setTab("sinking")} style={{width:"100%",marginTop:8,padding:"9px 0",borderRadius:10,border:`1px solid ${T.border}`,background:"none",color:"#B4FF00",fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Nouveau Sinking Fund</button>
+              <button onClick={()=>setTab("sinking")} style={{width:"100%",marginTop:8,padding:"9px 0",borderRadius:10,border:`1px solid ${T.border}`,background:"none",color:T.accentText,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Nouveau Sinking Fund</button>
             </div>
 
             {/* Recent */}
@@ -2169,7 +2203,7 @@ export default function App() {
                 <div style={{background:T.card,borderRadius:16,overflow:"hidden",border:`1px solid ${T.border}`,marginBottom:8}}>
                   {txs.slice(0,3).map((tx,i)=><TxRow key={tx.id} tx={tx} onDelete={deleteTx} subcats={subcats} envelopes={envelopes} incomeRules={incomeRules} last={i===Math.min(2,txs.length-1)}/>)}
                 </div>
-                {txs.length>3&&<button onClick={()=>setTab("history")} style={{width:"100%",padding:"12px 0",background:"none",border:"none",color:"#B4FF00",fontSize:14,fontWeight:700,cursor:"pointer"}}>Voir tout →</button>}
+                {txs.length>3&&<button onClick={()=>setTab("history")} style={{width:"100%",padding:"12px 0",background:"none",border:"none",color:T.accentText,fontSize:14,fontWeight:700,cursor:"pointer"}}>Voir tout →</button>}
               </>
             )}
           </div>
@@ -2179,8 +2213,8 @@ export default function App() {
       {/* ══ ADD ══════════════════════════════════════════════════════════════ */}
       {tab==="add"&&(
         <div style={{flex:1,overflowY:"auto",paddingBottom:90}}>
-          <div style={{background:"#060E08",borderBottom:`1px solid ${T.border}`,padding:"52px 16px 14px"}}>
-            <div style={{display:"flex",background:"#040806",borderRadius:12,padding:3,marginBottom:14}}>
+          <div style={{background:T.card,borderBottom:`1px solid ${T.border}`,padding:"52px 16px 14px"}}>
+            <div style={{display:"flex",background:T.bg,borderRadius:12,padding:3,marginBottom:14}}>
               {[["expense","💸 Dépense","#F87171"],["income","💰 Revenu","#34D399"]].map(([m,lbl,c])=>(
                 <button key={m} onClick={()=>setAddMode(m)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",background:addMode===m?c+"20":"transparent",color:addMode===m?c:T.sub,fontSize:14,fontWeight:700,boxShadow:addMode===m?`inset 0 0 0 1.5px ${c}60`:"none"}}>{lbl}</button>
               ))}
@@ -2193,20 +2227,20 @@ export default function App() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:2,marginBottom:12}}>
               {["1","2","3","4","5","6","7","8","9",".",0,"⌫"].map((k,i)=>(
-                <button key={i} onClick={()=>pressKey(String(k))} style={{padding:"15px 0",fontSize:k==="⌫"?20:22,fontWeight:600,background:k==="⌫"?"#040806":"#080F09",border:`1px solid ${T.border}`,borderRadius:10,cursor:"pointer",color:k==="⌫"?"#F87171":T.text}}>{k}</button>
+                <button key={i} onClick={()=>pressKey(String(k))} style={{padding:"15px 0",fontSize:k==="⌫"?20:22,fontWeight:600,background:k==="⌫"?T.card:T.card2,border:`1px solid ${T.border}`,borderRadius:10,cursor:"pointer",color:k==="⌫"?"#F87171":T.text}}>{k}</button>
               ))}
             </div>
             {/* ── Témoin seuil — uniquement en mode dépense ── */}
             {addMode==="expense"&&disponible<=seuils.alerte&&(
               <div style={{
                 padding:"10px 14px",borderRadius:12,marginBottom:10,
-                background:disponible<=seuils.blocage?"#1A0808":"#141005",
+                background:disponible<=seuils.blocage?T.isDark?"#1A0808":"#FEF2F2":T.isDark?"#141005":T.card2,
                 border:`1px solid ${disponible<=seuils.blocage?"#F87171":"#B4FF00"}`,
                 display:"flex",alignItems:"center",gap:10,
               }}>
                 <span style={{fontSize:16,flexShrink:0}}>{disponible<=seuils.blocage?"🔴":"🟡"}</span>
                 <div>
-                  <div style={{fontSize:12,fontWeight:700,color:disponible<=seuils.blocage?"#F87171":"#B4FF00"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:disponible<=seuils.blocage?"#F87171":T.accentText}}>
                     {disponible<=seuils.blocage?"Zone de blocage":"Zone d'alerte"}
                   </div>
                   <div style={{fontSize:11,color:"#3A6040"}}>
@@ -2229,13 +2263,13 @@ export default function App() {
                 <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>TYPE DE REVENU</div>
                 <div style={{display:"flex",gap:6,marginBottom:14}}>
                   {Object.entries(incomeRules).map(([k,r])=>(
-                    <button key={k} onClick={()=>setIT(k)} style={{flex:1,padding:"9px 4px",borderRadius:11,border:`1.5px solid ${incomeType===k?r.color:T.border}`,background:incomeType===k?r.color+"18":"#060E08",color:incomeType===k?r.color:T.sub,fontSize:11,fontWeight:700,cursor:"pointer"}}>{r.icon} {r.label}</button>
+                    <button key={k} onClick={()=>setIT(k)} style={{flex:1,padding:"9px 4px",borderRadius:11,border:`1.5px solid ${incomeType===k?r.color:T.border}`,background:incomeType===k?r.color+"18":T.card,color:incomeType===k?r.color:T.sub,fontSize:11,fontWeight:700,cursor:"pointer"}}>{r.icon} {r.label}</button>
                   ))}
                 </div>
                 <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>RENOUVELLEMENT</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
                   {RECUR_OPTIONS.map(ro=>(
-                    <button key={ro.id} onClick={()=>setRecur(ro.id)} style={{padding:"6px 12px",borderRadius:20,border:`1px solid ${recur===ro.id?"#B4FF00":T.border}`,background:recur===ro.id?"#B4FF0018":"#060E08",color:recur===ro.id?"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>{ro.label}</button>
+                    <button key={ro.id} onClick={()=>setRecur(ro.id)} style={{padding:"6px 12px",borderRadius:20,border:`1px solid ${recur===ro.id?"#B4FF00":T.border}`,background:recur===ro.id?T.accent+"18":T.card,color:recur===ro.id?"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>{ro.label}</button>
                   ))}
                 </div>
                 <div style={{marginBottom:14}}><SplitPreview/></div>
@@ -2245,7 +2279,7 @@ export default function App() {
                 <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>CATÉGORIE</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
                   {subcats.map(sc=>{ const env=envelopes.find(e=>e.id===sc.envelopeId); const active=subcatId===sc.id; return (
-                    <button key={sc.id} onClick={()=>setScId(sc.id)} style={{padding:"7px 13px",borderRadius:20,border:`1.5px solid ${active?env?.color||T.border:T.border}`,background:active?(env?.bg||"#061510"):"#060E08",color:active?(env?.color||T.text):T.sub,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+                    <button key={sc.id} onClick={()=>setScId(sc.id)} style={{padding:"7px 13px",borderRadius:20,border:`1.5px solid ${active?env?.color||T.border:T.border}`,background:active?(env?.bg||T.card2):T.card,color:active?(env?.color||T.text):T.sub,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
                       <span style={{width:7,height:7,borderRadius:"50%",background:env?.color||T.sub,display:"inline-block",flexShrink:0}}/>{sc.label}
                     </button>
                   );})}
@@ -2254,7 +2288,7 @@ export default function App() {
             )}
             <input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Description (optionnel)" style={{...inp,marginBottom:8}}/>
             {!showNote
-              ?<button onClick={()=>setShowNote(true)} style={{fontSize:13,color:"#B4FF00",background:"none",border:"none",cursor:"pointer",padding:0,fontWeight:700,marginBottom:16}}>+ Ajouter une note</button>
+              ?<button onClick={()=>setShowNote(true)} style={{fontSize:13,color:T.accentText,background:"none",border:"none",cursor:"pointer",padding:0,fontWeight:700,marginBottom:16}}>+ Ajouter une note</button>
               :<input value={note} onChange={e=>setNote(e.target.value)} placeholder="Note..." style={{...inp,marginBottom:16}}/>
             }
           </div>
@@ -2304,7 +2338,7 @@ export default function App() {
             <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
               <button onClick={()=>{ setHEnv("all"); setHSC("all"); }} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hEnv==="all"?"#B4FF00":T.border}`,background:hEnv==="all"?"#B4FF0022":T.card2,color:hEnv==="all"?"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>Toutes</button>
               {envelopes.map(env=>(
-                <button key={env.id} onClick={()=>{ setHEnv(env.id); setHSC("all"); }} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hEnv===env.id?env.color:T.border}`,background:hEnv===env.id?env.color+"22":"#060E08",color:hEnv===env.id?env.color:T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                <button key={env.id} onClick={()=>{ setHEnv(env.id); setHSC("all"); }} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hEnv===env.id?env.color:T.border}`,background:hEnv===env.id?env.color+"22":T.card,color:hEnv===env.id?env.color:T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                   <span style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:env.color,marginRight:5,verticalAlign:"middle"}}/>{env.label}
                 </button>
               ))}
@@ -2317,7 +2351,7 @@ export default function App() {
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:16}}>
                   <button onClick={()=>setHSC("all")} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hSubcat==="all"?"#B4FF00":T.border}`,background:hSubcat==="all"?"#B4FF0022":T.card2,color:hSubcat==="all"?"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>Toutes</button>
                   {filteredSubcats.map(sc=>{ const env=envelopes.find(e=>e.id===sc.envelopeId); return (
-                    <button key={sc.id} onClick={()=>setHSC(sc.id)} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hSubcat===sc.id?env?.color||"#B4FF00":T.border}`,background:hSubcat===sc.id?(env?.color||"#B4FF00")+"22":"#060E08",color:hSubcat===sc.id?env?.color||"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                    <button key={sc.id} onClick={()=>setHSC(sc.id)} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hSubcat===sc.id?env?.color||"#B4FF00":T.border}`,background:hSubcat===sc.id?(env?.color||T.accent)+"22":T.card,color:hSubcat===sc.id?env?.color||"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{width:5,height:5,borderRadius:"50%",background:env?.color||T.sub,display:"inline-block"}}/>{sc.label}
                     </button>
                   );})}
@@ -2352,7 +2386,7 @@ export default function App() {
                     return <SinkingCard key={f.id} fund={f} onDelete={deleteSink} onAdd={addToSink} onUse={useSinkFund} tresorerie={bal.tresorerie||0} totalAlloue={totalAlloue}/>;
                   })}
 
-            <div style={{background:"#060E08",borderRadius:16,padding:"16px",border:`1px solid ${T.border}`,marginTop:16}}>
+            <div style={{background:T.card,borderRadius:16,padding:"16px",border:`1px solid ${T.border}`,marginTop:16}}>
               <div style={{fontSize:11,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:12}}>NOUVEAU SINKING FUND</div>
               <div style={{display:"flex",gap:8,marginBottom:10}}>
                 <input value={sfIcon} onChange={e=>setSFI(e.target.value)} placeholder="🎯" style={{...inp,width:52,textAlign:"center",fontSize:20,padding:"8px 4px"}}/>
@@ -2367,7 +2401,7 @@ export default function App() {
                 <input type="number" value={sfMonthly} onChange={e=>setSFM(e.target.value)} placeholder="50 000" style={inp}/>
               </div>
               {sfGoal&&sfMonthly&&parseFloat(sfMonthly)>0&&(
-                <div style={{background:T.muted,borderRadius:10,padding:"8px 12px",marginBottom:12,fontSize:12,color:"#B4FF00"}}>
+                <div style={{background:T.muted,borderRadius:10,padding:"8px 12px",marginBottom:12,fontSize:12,color:T.accentText}}>
                   🎯 Atteint en ~{Math.ceil(parseFloat(sfGoal)/parseFloat(sfMonthly))} mois
                 </div>
               )}
@@ -2391,7 +2425,7 @@ export default function App() {
             {/* Reset confirmation modal */}
             {showReset&&(
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-                <div style={{background:"#0B1A12",borderRadius:20,padding:24,border:`1px solid #F8717160`,maxWidth:320,width:"100%"}}>
+                <div style={{background:T.card2,borderRadius:20,padding:24,border:`1px solid #F8717160`,maxWidth:320,width:"100%"}}>
                   <div style={{fontSize:18,fontWeight:800,color:T.text,marginBottom:8}}>Réinitialiser le profil ?</div>
                   <div style={{fontSize:13,color:T.sub,marginBottom:20,lineHeight:1.5}}>
                     Toutes les transactions, enveloppes, sinking funds et dépenses récurrentes seront supprimées. Cette action est irréversible.
@@ -2403,9 +2437,9 @@ export default function App() {
                 </div>
               </div>
             )}
-            <div style={{display:"flex",background:"#040806",borderRadius:12,padding:3,marginBottom:20}}>
+            <div style={{display:"flex",background:T.bg,borderRadius:12,padding:3,marginBottom:20}}>
               {[["envelopes","Enveloppes"],["splits","Répartition %"]].map(([id,lbl])=>(
-                <button key={id} onClick={()=>setCatTab(id)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",background:catTab===id?"#B4FF00":"transparent",color:catTab===id?"#fff":T.sub,fontSize:13,fontWeight:700}}>{lbl}</button>
+                <button key={id} onClick={()=>setCatTab(id)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",background:catTab===id?T.accent:"transparent",color:catTab===id?T.isDark?"#020303":"#fff":T.sub,fontSize:13,fontWeight:700}}>{lbl}</button>
               ))}
             </div>
 
@@ -2455,7 +2489,7 @@ export default function App() {
                       </div>
                       {/* Color picker inline */}
                       {editingColor===env.id&&(
-                        <div style={{padding:"10px 16px 14px",background:"#040806",borderBottom:`1px solid ${T.border}`}}>
+                        <div style={{padding:"10px 16px 14px",background:T.bg,borderBottom:`1px solid ${T.border}`}}>
                           <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>CHOISIR UNE COULEUR</div>
                           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
                             {["#F87171","#FBBF24","#34D399","#B4FF00","#60A5FA","#A78BFA","#F472B6","#FB923C","#94A3B8","#E2E8F0","#818CF8","#2DD4BF"].map(c=>(
@@ -2470,13 +2504,13 @@ export default function App() {
                                 style={{width:"100%",height:"100%",borderRadius:"50%",border:"none",cursor:"pointer",padding:0,background:"none"}}/>
                             </div>
                           </div>
-                          <button onClick={()=>setEC(null)} style={{fontSize:12,color:"#B4FF00",background:"none",border:"none",cursor:"pointer",fontWeight:700}}>✓ Fermer</button>
+                          <button onClick={()=>setEC(null)} style={{fontSize:12,color:T.accentText,background:"none",border:"none",cursor:"pointer",fontWeight:700}}>✓ Fermer</button>
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
-                <div style={{background:"#060E08",borderRadius:16,padding:"14px 16px",border:`1px solid ${T.border}`,marginBottom:24}}>
+                <div style={{background:T.card,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.border}`,marginBottom:24}}>
                   <div style={{fontSize:11,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>NOUVELLE ENVELOPPE</div>
                   <input value={newEnvLabel} onChange={e=>setNEL(e.target.value)} placeholder="Nom" style={{...inp,marginBottom:10}}/>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
@@ -2492,7 +2526,7 @@ export default function App() {
                     <div key={env.id} style={{marginBottom:20}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                         <span style={{width:10,height:10,borderRadius:"50%",background:env.color,display:"inline-block"}}/>
-                        <span style={{fontSize:11,color:env.color,fontWeight:700,letterSpacing:1.5}}>{env.label.toUpperCase()}</span>
+                        <span style={{fontSize:11,color:envTextColor(env.color),fontWeight:700,letterSpacing:1.5}}>{env.label.toUpperCase()}</span>
                       </div>
                       <div style={{background:T.card,borderRadius:16,overflow:"hidden",border:`1px solid ${T.border}`,marginBottom:10}}>
                         {scs.length===0&&<div style={{padding:"12px 16px",fontSize:13,color:T.sub}}>Aucune sous-catégorie</div>}
@@ -2504,7 +2538,7 @@ export default function App() {
                                 onBlur={()=>{ if(editingSubLabel.trim()) setSub(subcats.map(x=>x.id===sc.id?{...x,label:editingSubLabel.trim()}:x)); setESC(null); }}
                                 onKeyDown={e=>{ if(e.key==="Enter") e.target.blur(); }}
                                 autoFocus
-                                style={{flex:1,padding:"3px 6px",borderRadius:6,border:`1px solid ${env.color}60`,background:"#040806",color:T.text,fontSize:14,outline:"none"}}/>
+                                style={{flex:1,padding:"3px 6px",borderRadius:6,border:`1px solid ${env.color}60`,background:T.bg,color:T.text,fontSize:14,outline:"none"}}/>
                             ):(
                               <div onClick={()=>{ setESC(sc.id); setESL(sc.label); }} style={{flex:1,fontSize:14,color:T.text,cursor:"pointer"}}>{sc.label}</div>
                             )}
@@ -2536,7 +2570,7 @@ export default function App() {
                             onBlur={()=>{ if(editingIRLabel.trim()) setIR(rules=>({...rules,[k]:{...rules[k],label:editingIRLabel.trim()}})); setEIR(null); }}
                             onKeyDown={e=>{ if(e.key==="Enter") e.target.blur(); }}
                             autoFocus
-                            style={{flex:1,padding:"3px 6px",borderRadius:6,border:`1px solid ${r.color}60`,background:"#040806",color:T.text,fontSize:14,fontWeight:700,outline:"none"}}/>
+                            style={{flex:1,padding:"3px 6px",borderRadius:6,border:`1px solid ${r.color}60`,background:T.bg,color:T.text,fontSize:14,fontWeight:700,outline:"none"}}/>
                         ):(
                           <span onClick={()=>{ setEIR(k); setEIRL(r.label); }} style={{fontSize:14,fontWeight:700,color:T.text,cursor:"pointer"}}>{r.label}</span>
                         )}
@@ -2550,17 +2584,17 @@ export default function App() {
                 ))}
 
                 {/* ── Add new income type ── */}
-                <div style={{background:"#060E08",borderRadius:14,padding:"14px 16px",border:`1px solid ${T.border}`,marginTop:8}}>
+                <div style={{background:T.card,borderRadius:14,padding:"14px 16px",border:`1px solid ${T.border}`,marginTop:8}}>
                   <div style={{fontSize:11,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:12}}>NOUVEAU TYPE DE REVENU</div>
                   <div style={{marginBottom:10}}>
                     <div style={{fontSize:11,color:T.sub,marginBottom:6}}>NOM</div>
-                    <input value={newIRLabel} onChange={e=>setNIRL(e.target.value)} placeholder="Ex: Dividendes, Location..." style={{width:"100%",padding:"9px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:"#040806",color:T.text,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+                    <input value={newIRLabel} onChange={e=>setNIRL(e.target.value)} placeholder="Ex: Dividendes, Location..." style={{width:"100%",padding:"9px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
                   </div>
                   <div style={{marginBottom:12}}>
                     <div style={{fontSize:11,color:T.sub,marginBottom:8}}>ICÔNE</div>
                     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                       {["💰","🏠","🎙️","💵","📦","🎵","📷","🖥️","✍️","🎬","📱","🔧","🏦","🎯","💼","🌐"].map(ic=>(
-                        <button key={ic} onClick={()=>setNIRI(ic)} style={{width:36,height:36,borderRadius:9,border:`1.5px solid ${newIRIcon===ic?"#B4FF00":T.border}`,background:newIRIcon===ic?"#B4FF0018":"#040806",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{ic}</button>
+                        <button key={ic} onClick={()=>setNIRI(ic)} style={{width:36,height:36,borderRadius:9,border:`1.5px solid ${newIRIcon===ic?"#B4FF00":T.border}`,background:newIRIcon===ic?T.accent+"18":T.bg,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{ic}</button>
                       ))}
                     </div>
                   </div>
@@ -2572,12 +2606,12 @@ export default function App() {
                         <span style={{fontSize:12,color:T.text,flex:1}}>{env.label}</span>
                         <input type="number" min="0" max="100" value={newIRSplit[env.id]??0}
                           onChange={e=>setNIRS(s=>({...s,[env.id]:e.target.value}))}
-                          style={{width:52,padding:"4px 8px",borderRadius:8,border:`1px solid ${T.border}`,background:"#040806",color:T.text,fontSize:13,fontWeight:700,outline:"none",textAlign:"center"}}/>
+                          style={{width:52,padding:"4px 8px",borderRadius:8,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:13,fontWeight:700,outline:"none",textAlign:"center"}}/>
                         <span style={{fontSize:12,color:T.sub}}>%</span>
                       </div>
                     ))}
                     {(()=>{ const tot=Object.values(newIRSplit).reduce((a,v)=>a+(parseFloat(v)||0),0); return (
-                      <div style={{fontSize:11,color:Math.round(tot)===100?"#B4FF00":"#F87171",marginTop:4,fontWeight:700}}>{Math.round(tot)}% / 100%</div>
+                      <div style={{fontSize:11,color:Math.round(tot)===100?T.accentText:"#F87171",marginTop:4,fontWeight:700}}>{Math.round(tot)}% / 100%</div>
                     ); })()}
                   </div>
                   <button onClick={()=>{
@@ -2607,7 +2641,7 @@ export default function App() {
 
             {/* Summary */}
             {recurExp.filter(r=>r.active).length>0&&(
-              <div style={{background:"#060E08",borderRadius:14,padding:"12px 16px",border:`1px solid ${T.border}`,marginBottom:20,display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div style={{background:T.card,borderRadius:14,padding:"12px 16px",border:`1px solid ${T.border}`,marginBottom:20,display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <div>
                   <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1,marginBottom:3}}>TOTAL / MOIS</div>
                   <div style={{fontSize:18,fontWeight:800,color:"#F87171"}}>
@@ -2621,14 +2655,14 @@ export default function App() {
                 </div>
                 <div>
                   <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1,marginBottom:3}}>ACTIFS</div>
-                  <div style={{fontSize:18,fontWeight:800,color:"#B4FF00"}}>{recurExp.filter(r=>r.active).length}</div>
+                  <div style={{fontSize:18,fontWeight:800,color:T.accentText}}>{recurExp.filter(r=>r.active).length}</div>
                 </div>
               </div>
             )}
 
             {/* List */}
             {recurExp.length===0&&(
-              <div style={{background:"#060E08",borderRadius:14,padding:32,textAlign:"center",color:T.sub,fontSize:14,border:`1px solid ${T.border}`,marginBottom:20}}>
+              <div style={{background:T.card,borderRadius:14,padding:32,textAlign:"center",color:T.sub,fontSize:14,border:`1px solid ${T.border}`,marginBottom:20}}>
                 Aucune dépense récurrente
               </div>
             )}
@@ -2641,12 +2675,12 @@ export default function App() {
                   const urgent=days<=3&&days>=0;
                   const overdue=days<0;
                   return (
-                    <div key={re.id} style={{background:"#060E08",borderRadius:14,padding:"14px 16px",border:`1.5px solid ${overdue?"#F87171":urgent?"#FBBF24":T.border}`,marginBottom:10,opacity:re.active?1:0.5}}>
+                    <div key={re.id} style={{background:T.card,borderRadius:14,padding:"14px 16px",border:`1.5px solid ${overdue?"#F87171":urgent?"#FBBF24":T.border}`,marginBottom:10,opacity:re.active?1:0.5}}>
                       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:8}}>
                         <div style={{flex:1}}>
                           <div style={{fontSize:15,fontWeight:700,color:T.text}}>{re.label}</div>
                           <div style={{fontSize:11,color:T.sub,marginTop:2,display:"flex",gap:8,alignItems:"center"}}>
-                            {env&&<span style={{color:env.color}}>● {env.label}</span>}
+                            {env&&<span style={{color:envTextColor(env.color)}>● {env.label}</span>}
                             <span>{sc?.label}</span>
                             <span>· {RECUR_OPTIONS.find(r=>r.id===re.period)?.label}</span>
                           </div>
@@ -2677,14 +2711,14 @@ export default function App() {
             )}
 
             {/* Add new recurring */}
-            <div style={{background:"#060E08",borderRadius:14,padding:"16px",border:`1px solid ${T.border}`}}>
+            <div style={{background:T.card,borderRadius:14,padding:"16px",border:`1px solid ${T.border}`}}>
               <div style={{fontSize:11,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:12}}>NOUVELLE DÉPENSE RÉCURRENTE</div>
-              <input value={reLabel} onChange={e=>setREL(e.target.value)} placeholder="Nom (ex: Netflix, JIRAMA...)" style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:"#040806",color:T.text,fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:10}}/>
-              <input value={reAmt} onChange={e=>setREA(e.target.value)} type="number" placeholder="Montant (Ar)" style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:"#040806",color:T.text,fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:10}}/>
+              <input value={reLabel} onChange={e=>setREL(e.target.value)} placeholder="Nom (ex: Netflix, JIRAMA...)" style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:10}}/>
+              <input value={reAmt} onChange={e=>setREA(e.target.value)} type="number" placeholder="Montant (Ar)" style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:10}}/>
               <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>FRÉQUENCE</div>
               <div style={{display:"flex",gap:6,marginBottom:10}}>
                 {RECUR_OPTIONS.filter(r=>r.id!=="none").map(ro=>(
-                  <button key={ro.id} onClick={()=>setREP(ro.id)} style={{flex:1,padding:"7px 4px",borderRadius:10,border:`1px solid ${rePeriod===ro.id?"#B4FF00":T.border}`,background:rePeriod===ro.id?"#B4FF0018":"#040806",color:rePeriod===ro.id?"#B4FF00":T.sub,fontSize:11,fontWeight:600,cursor:"pointer"}}>{ro.label.replace("Chaque ","")}</button>
+                  <button key={ro.id} onClick={()=>setREP(ro.id)} style={{flex:1,padding:"7px 4px",borderRadius:10,border:`1px solid ${rePeriod===ro.id?"#B4FF00":T.border}`,background:rePeriod===ro.id?T.accent+"18":T.bg,color:rePeriod===ro.id?"#B4FF00":T.sub,fontSize:11,fontWeight:600,cursor:"pointer"}}>{ro.label.replace("Chaque ","")}</button>
                 ))}
               </div>
               <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>CATÉGORIE</div>
@@ -2693,14 +2727,14 @@ export default function App() {
                   const env=envelopes.find(e=>e.id===sc.envelopeId);
                   const active=reScId===sc.id;
                   return (
-                    <button key={sc.id} onClick={()=>setRESC(sc.id)} style={{padding:"5px 10px",borderRadius:20,border:`1.5px solid ${active?env?.color||"#B4FF00":T.border}`,background:active?(env?.bg||T.muted):"#040806",color:active?(env?.color||T.text):T.sub,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                    <button key={sc.id} onClick={()=>setRESC(sc.id)} style={{padding:"5px 10px",borderRadius:20,border:`1.5px solid ${active?env?.color||"#B4FF00":T.border}`,background:active?(env?.bg||T.card2):T.bg,color:active?(env?.color||T.text):T.sub,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{width:5,height:5,borderRadius:"50%",background:env?.color||T.sub,display:"inline-block"}}/>{sc.label}
                     </button>
                   );
                 })}
               </div>
               <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>PREMIÈRE ÉCHÉANCE</div>
-              <input type="date" value={reNextDate} onChange={e=>setREND(e.target.value)} style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:"#040806",color:T.text,fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:12,colorScheme:"dark"}}/>
+              <input type="date" value={reNextDate} onChange={e=>setREND(e.target.value)} style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:12,colorScheme:"dark"}}/>
               <button onClick={addRecurExp} style={{width:"100%",padding:"12px 0",borderRadius:12,border:"none",background:reLabel&&reAmt&&reScId?"#B4FF00":T.muted,color:reLabel&&reAmt&&reScId?"#020303":T.sub,fontSize:14,fontWeight:800,cursor:reLabel&&reAmt&&reScId?"pointer":"not-allowed"}}>
                 + Ajouter
               </button>
@@ -2711,7 +2745,7 @@ export default function App() {
 
       {/* ══ BOTTOM NAV — MOBILE ONLY ══════════════════════════════════════════ */}
       {!isDesktop && (
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"rgba(2,3,3,0.98)",backdropFilter:"blur(24px)",borderTop:`1px solid ${T.border}`,display:"flex",paddingBottom:18,paddingTop:10,zIndex:100}}>
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:T.isDark?"rgba(2,3,3,0.98)":"rgba(245,247,242,0.98)",backdropFilter:"blur(24px)",borderTop:`1px solid ${T.border}`,display:"flex",paddingBottom:18,paddingTop:10,zIndex:100}}>
         {NAV_ITEMS.map(t=>t.big?(
           <div key="add" style={{flex:1,display:"flex",justifyContent:"center"}}>
             <button onClick={()=>setTab("add")} style={{width:50,height:50,borderRadius:16,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#B4FF00,#5FD34A)",boxShadow:"0 4px 20px #B4FF0060",display:"flex",alignItems:"center",justifyContent:"center",marginTop:-10}}>
@@ -2722,11 +2756,11 @@ export default function App() {
           </div>
         ):(
           <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,background:"none",border:"none",cursor:"pointer",position:"relative"}}>
-            {t.svg(tab===t.id?"#B4FF00":T.sub)}
+            {t.svg(tab===t.id?T.accentText:T.sub)}
             {t.id==="recurring"&&recurExp.some(r=>r.active&&daysUntil(r.nextDate)<=3)&&(
               <span style={{position:"absolute",top:0,right:"18%",width:6,height:6,borderRadius:"50%",background:"#F87171"}}/>
             )}
-            <span style={{fontSize:9,fontWeight:tab===t.id?700:400,color:tab===t.id?"#B4FF00":T.sub}}>{t.label}</span>
+            <span style={{fontSize:9,fontWeight:tab===t.id?700:400,color:tab===t.id?T.accentText:T.sub}}>{t.label}</span>
           </button>
         ))}
       </div>
@@ -2735,10 +2769,10 @@ export default function App() {
       {/* ── URGENCE MODAL ── */}
       {urgencyModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(2,3,3,0.97)",zIndex:600,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",padding:"0 0 32px",fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif"}}>
-          <div style={{width:"100%",maxWidth:430,background:"#060E08",borderRadius:"20px 20px 0 0",border:"1px solid #2A1010",overflow:"hidden"}}>
+          <div style={{width:"100%",maxWidth:430,background:T.card,borderRadius:"20px 20px 0 0",border:"1px solid #2A1010",overflow:"hidden"}}>
 
             {/* Header */}
-            <div style={{background:"#1A0808",borderBottom:"1px solid #2A1010",padding:"20px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{background:T.isDark?"#1A0808":"#FEF2F2",borderBottom:"1px solid #2A1010",padding:"20px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
                 <div style={{fontSize:16,fontWeight:800,color:"#F87171"}}>🚨 Urgence Trésorerie</div>
                 <div style={{fontSize:12,color:"#3A6040",marginTop:3}}>Cette action sera tracée dans l'historique.</div>
@@ -2751,22 +2785,22 @@ export default function App() {
               {/* Étape 1 — Confirmation */}
               {urgencyModal.step==="confirm"&&(
                 <>
-                  <div style={{background:"#100808",borderRadius:12,padding:"14px",border:"1px solid #2A1010",marginBottom:16,textAlign:"center"}}>
+                  <div style={{background:T.isDark?"#100808":"#FEF2F2",borderRadius:12,padding:"14px",border:"1px solid #2A1010",marginBottom:16,textAlign:"center"}}>
                     <div style={{fontSize:24,marginBottom:6}}>‼️</div>
                     <div style={{fontSize:14,fontWeight:700,color:"#F87171",marginBottom:4}}>C'est vraiment une urgence ?</div>
-                    <div style={{fontSize:12,color:"#3A6040",lineHeight:1.5}}>La Trésorerie est ta réserve de sécurité.<br/>Ne l'utilise que si c'est absolument nécessaire.</div>
+                    <div style={{fontSize:12,color:T.sub,lineHeight:1.5}}>La Trésorerie est ta réserve de sécurité.<br/>Ne l'utilise que si c'est absolument nécessaire.</div>
                   </div>
-                  <div style={{fontSize:10,color:"#3A6040",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>DESCRIPTION DE L'URGENCE</div>
+                  <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>DESCRIPTION DE L'URGENCE</div>
                   <input value={urgencyModal.label} onChange={e=>setUrgencyModal(u=>({...u,label:e.target.value}))}
                     placeholder="Ex : Médicaments urgents, Réparation…"
-                    style={{width:"100%",padding:"11px 12px",borderRadius:10,border:"1px solid #2A1010",background:"#040806",color:"#E8FFD4",fontSize:14,outline:"none",marginBottom:12,boxSizing:"border-box"}}/>
-                  <div style={{fontSize:10,color:"#3A6040",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>MONTANT</div>
+                    style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:14,outline:"none",marginBottom:12,boxSizing:"border-box"}}/>
+                  <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>MONTANT</div>
                   <input type="number" value={urgencyModal.amt} onChange={e=>setUrgencyModal(u=>({...u,amt:e.target.value}))}
                     placeholder="0"
-                    style={{width:"100%",padding:"11px 12px",borderRadius:10,border:"1px solid #2A1010",background:"#040806",color:"#F87171",fontSize:18,fontWeight:800,outline:"none",marginBottom:20,boxSizing:"border-box"}}/>
+                    style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:"#F87171",fontSize:18,fontWeight:800,outline:"none",marginBottom:20,boxSizing:"border-box"}}/>
                   <div style={{display:"flex",gap:10}}>
                     <button onClick={()=>setUrgencyModal(null)}
-                      style={{flex:1,padding:"13px 0",borderRadius:12,border:"1px solid #122416",background:"none",color:"#3A6040",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                      style={{flex:1,padding:"13px 0",borderRadius:12,border:`1px solid ${T.border}`,background:"none",color:T.sub,fontSize:14,fontWeight:700,cursor:"pointer"}}>
                       Annuler
                     </button>
                     <button onClick={()=>{
@@ -2774,7 +2808,7 @@ export default function App() {
                       setUrgencyModal(u=>({...u,step:"pin",pinInput:"",pinError:false}));
                     }}
                       disabled={!urgencyModal.label.trim()||!parseFloat(urgencyModal.amt)}
-                      style={{flex:2,padding:"13px 0",borderRadius:12,border:"none",background:urgencyModal.label.trim()&&parseFloat(urgencyModal.amt)?"#F87171":"#1A0808",color:urgencyModal.label.trim()&&parseFloat(urgencyModal.amt)?"#020303":"#3A6040",fontSize:14,fontWeight:800,cursor:"pointer"}}>
+                      style={{flex:2,padding:"13px 0",borderRadius:12,border:"none",background:urgencyModal.label.trim()&&parseFloat(urgencyModal.amt)?"#F87171":T.muted,color:urgencyModal.label.trim()&&parseFloat(urgencyModal.amt)?"#020303":T.sub,fontSize:14,fontWeight:800,cursor:"pointer"}}>
                       Oui, c'est urgent →
                     </button>
                   </div>
@@ -2785,8 +2819,8 @@ export default function App() {
               {urgencyModal.step==="pin"&&(
                 <>
                   <div style={{textAlign:"center",marginBottom:24}}>
-                    <div style={{fontSize:14,fontWeight:700,color:"#E8FFD4",marginBottom:4}}>Confirme avec ton code PIN</div>
-                    <div style={{fontSize:12,color:"#3A6040"}}>Montant : <span style={{color:"#F87171",fontWeight:700}}>{fmt(parseFloat(urgencyModal.amt)||0)}</span> — {urgencyModal.label}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:4}}>Confirme avec ton code PIN</div>
+                    <div style={{fontSize:12,color:T.sub}}>Montant : <span style={{color:"#F87171",fontWeight:700}}>{fmt(parseFloat(urgencyModal.amt)||0)}</span> — {urgencyModal.label}</div>
                   </div>
                   <div style={{display:"flex",gap:14,justifyContent:"center",marginBottom:28}}>
                     {[0,1,2,3].map(i=>(
@@ -2813,14 +2847,14 @@ export default function App() {
                           if(next.length<=4) setUrgencyModal(u=>({...u,pinInput:next}));
                           if(next.length===4) setTimeout(()=>submitUrgency(next), 150);
                         }}
-                          style={{height:56,width:56,borderRadius:"50%",border:"1px solid #122416",background:"#060E08",color:"#E8FFD4",fontSize:20,fontWeight:600,cursor:"pointer",margin:"0 auto"}}>
+                          style={{height:56,width:56,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.card,color:"#E8FFD4",fontSize:20,fontWeight:600,cursor:"pointer",margin:"0 auto"}}>
                           {k}
                         </button>
                       );
                     })}
                   </div>
                   <button onClick={()=>setUrgencyModal(u=>({...u,step:"confirm"}))}
-                    style={{width:"100%",marginTop:20,padding:"11px 0",borderRadius:12,border:"1px solid #122416",background:"none",color:"#3A6040",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                    style={{width:"100%",marginTop:20,padding:"11px 0",borderRadius:12,border:`1px solid ${T.border}`,background:"none",color:"#3A6040",fontSize:13,fontWeight:600,cursor:"pointer"}}>
                     ← Retour
                   </button>
                 </>
