@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
 // ─── RESPONSIVE HOOK ──────────────────────────────────────────────────────────
 function useIsDesktop() {
@@ -13,20 +13,20 @@ function useIsDesktop() {
   return isDesktop;
 }
 
-const DARK_THEME  = { bg:"#020303", card:"#060E08", card2:"#0A1A0C", border:"#122416", text:"#E8FFD4", accent:"#B4FF00", accentD:"#A6FF1A", green:"#5FD34A", sub:"#3A6040", muted:"#080F09", accentText:"#B4FF00", isDark:true };
+const DARK_THEME  = { bg:"#020303", card:"#060E08", card2:"#0A1A0C", border:"#122416", text:"#E8FFD4", accent:"#B4FF00", accentD:"#A6FF1A", green:"#5FD34A", sub:"#3A6040", muted:"#080F09", accentText:"#B4FF00", accentBtn:"#020303", chipBg:"#B4FF00", chipText:"#020303", isDark:true };
 // Light: accent only on CTA buttons/borders, accentText for readable colored labels (#2D6A00 = AAA contrast on white)
-const LIGHT_THEME = { bg:"#F5F7F2", card:"#FFFFFF", card2:"#EEF3E8", border:"#C8DFB0", text:"#0D1F0F", accent:"#5C9E00", accentD:"#4A8200", green:"#059669", sub:"#4A6550", muted:"#E8F0DF", accentText:"#2D6A00", isDark:false };
+const LIGHT_THEME = { bg:"#F2F2ED", card:"#FFFFFF", card2:"#EBEBEB", border:"#DDDDD6", text:"#141411", accent:"#C4F013", accentD:"#B8E800", green:"#C4F013", sub:"#888884", muted:"#E8E8E0", accentText:"#141411", accentBtn:"#141411", chipBg:"#0A0A0A", chipText:"#C4F013", isDark:false };
+// Light theme — strictly Krew palette: #F2F2ED #FFFFFF #C4F013 #141411 #030302
+// accent ONLY as background — text on accent always #141411 (black)
 // T is a mutable reference updated at runtime — components read T directly
 let T = DARK_THEME;
 const THEME_KEY = "sf_theme";
 // ─── SEUILS ───────────────────────────────────────────────────────────────────
-// envTextColor: makes bright envelope colors readable on light backgrounds
-// #B4FF00 (lime) and similar neons are unreadable on white — darken them
+// envTextColor: neon colors unreadable on white — in light mode return #141411 (black)
 function envTextColor(hexColor) {
   if (!T.isDark) {
-    // Map known neon colors to dark equivalents
-    const map = { "#B4FF00":"#2D6A00", "#A6FF1A":"#2D6A00", "#5FD34A":"#2A7A3A", "#34D399":"#0A6A4A" };
-    return map[hexColor] || hexColor;
+    const neons = ["#B4FF00","#A6FF1A","#C4F013","#B8E800","#5FD34A","#34D399"];
+    if (neons.includes(hexColor)) return "#141411";
   }
   return hexColor;
 }
@@ -58,8 +58,9 @@ const makeFmt = (cur) => (n) => new Intl.NumberFormat("fr-FR").format(Math.round
 const DEFAULT_ENVELOPES = [
   { id:"survie",       label:"Survie",       color:"#F87171", bg:"#1A0808" },
   { id:"tresorerie",   label:"Trésorerie",   color:"#B4FF00", bg:"#141005", system:true },
-  { id:"operationnel", label:"Opérationnel", color:"#B4FF00", bg:"#061510" },
+  { id:"operationnel", label:"Opérationnel", color:"#34D399", bg:"#061510" },
   { id:"differable",   label:"Différable",   color:"#94A3B8", bg:"#0A0D12" },
+  { id:"donation",     label:"Donation",     color:"#F59E0B", bg:"#1A0F00" },
 ];
 const DEFAULT_SUBCATS = [
   { id:"repas",label:"Repas",envelopeId:"survie" },
@@ -70,7 +71,6 @@ const DEFAULT_SUBCATS = [
   { id:"tel",label:"Téléphone",envelopeId:"survie" },
   { id:"medic",label:"Médicament",envelopeId:"survie" },
   { id:"loyer_dep",label:"Loyer",envelopeId:"survie" },
-  { id:"reserve",label:"Mise en réserve",envelopeId:"tresorerie" },
   { id:"data",label:"Data",envelopeId:"operationnel" },
   { id:"deplacement",label:"Déplacement client",envelopeId:"operationnel" },
   { id:"impression",label:"Impression",envelopeId:"operationnel" },
@@ -82,11 +82,14 @@ const DEFAULT_SUBCATS = [
   { id:"vetements",label:"Vêtements",envelopeId:"differable" },
   { id:"cadeaux",label:"Cadeaux",envelopeId:"differable" },
   { id:"autre_dif",label:"Autre",envelopeId:"differable" },
+  { id:"dime",label:"Dîme",envelopeId:"donation" },
+  { id:"don_ponctuel",label:"Don ponctuel",envelopeId:"donation" },
+  { id:"aide_famille",label:"Aide famille",envelopeId:"donation" },
 ];
 const DEFAULT_INCOME_RULES = {
-  loyer:      { label:"Loyer",        icon:"🏠", color:"#B4FF00", split:{ survie:60,tresorerie:30,operationnel:10,differable:0 } },
-  prestation: { label:"Prestation",   icon:"🎙️", color:"#A78BFA", split:{ survie:0,tresorerie:50,operationnel:30,differable:20 } },
-  autre:      { label:"Autre revenu", icon:"💵", color:"#F472B6", split:{ survie:0,tresorerie:50,operationnel:30,differable:20 } },
+  loyer:      { label:"Loyer",        icon:"🏠", color:"#B4FF00", split:{ survie:60,tresorerie:20,operationnel:10,differable:0,donation:10 } },
+  prestation: { label:"Prestation",   icon:"🎙️", color:"#A78BFA", split:{ survie:0,tresorerie:45,operationnel:30,differable:15,donation:10 } },
+  autre:      { label:"Autre revenu", icon:"💵", color:"#F472B6", split:{ survie:0,tresorerie:45,operationnel:30,differable:15,donation:10 } },
 };
 const RECUR_OPTIONS = [
   { id:"none",label:"Aucun" },{ id:"weekly",label:"Chaque semaine" },
@@ -387,37 +390,125 @@ function makeDefaultProfile(name) {
 const DEFAULT_PROFILES = [{ id:"default", name:"Perso" }];
 
 // ─── LINE CHART ───────────────────────────────────────────────────────────────
-function LineChart({ txs, filter }) {
-  const points = useMemo(()=>{
-    const now=new Date(), days=filter==="week"?7:filter==="month"?30:365, pts=[];
-    for(let i=days;i>=0;i--){
-      const d=new Date(now); d.setDate(d.getDate()-i);
-      const dt=txs.filter(t=>new Date(t.date).toDateString()===d.toDateString());
-      pts.push({ date:d, inc:dt.filter(t=>t.type==="income").reduce((a,t)=>a+t.amount,0), exp:dt.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0), label:d.toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) });
+function LineChart({ txs, filter, offset, onOffsetChange }) {
+  const [tooltip, setTooltip] = useState(null);
+  const svgRef = useRef(null);
+
+  const { points, periodLabel } = useMemo(()=>{
+    if(!txs.length) return { points:[], periodLabel:"" };
+    const now = new Date();
+    let start, end, label;
+    if(filter==="week") {
+      const day=now.getDay();
+      const mon=new Date(now); mon.setDate(now.getDate()-(day===0?6:day-1)); mon.setHours(0,0,0,0);
+      start=new Date(mon); start.setDate(mon.getDate()+offset*7);
+      end=new Date(start); end.setDate(start.getDate()+6); end.setHours(23,59,59,999);
+      label=`${start.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} – ${end.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}`;
+    } else if(filter==="month") {
+      const base=new Date(now.getFullYear(), now.getMonth()+offset, 1);
+      start=base; end=new Date(base.getFullYear(),base.getMonth()+1,0,23,59,59,999);
+      label=start.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+    } else {
+      const y=now.getFullYear()+offset;
+      start=new Date(y,0,1); end=new Date(y,11,31,23,59,59,999);
+      label=String(y);
     }
-    let bal=0,out=[];
-    for(let i=pts.length-1;i>=0;i--) bal+=pts[i].inc-pts[i].exp;
-    let r=bal; for(const p of pts){ r+=p.inc-p.exp; out.push({...p,bal:r}); }
-    return out;
-  },[txs,filter]);
-  if(!points.length) return <div style={{textAlign:"center",color:T.sub,fontSize:13,padding:"20px 0"}}>Pas encore de données</div>;
-  const vals=points.map(p=>p.bal), mn=Math.min(...vals), mx=Math.max(...vals), range=mx-mn||1;
-  const W=340,H=100,P=8;
-  const toX=i=>(i/(points.length-1||1))*(W-P*2)+P;
+    let baseBal=0;
+    for(const t of txs){ const d=new Date(t.date); if(d<start) baseBal+=t.type==="income"?t.amount:-t.amount; }
+    const pts=[], cursor=new Date(start); let running=baseBal;
+    const endCap=end>now?now:end;
+    while(cursor<=endCap){
+      const ds=cursor.toDateString();
+      for(const t of txs.filter(t=>new Date(t.date).toDateString()===ds)) running+=t.type==="income"?t.amount:-t.amount;
+      const lbl=filter==="year"?cursor.toLocaleDateString("fr-FR",{month:"short"}):cursor.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
+      pts.push({date:new Date(cursor),bal:running,label:lbl});
+      cursor.setDate(cursor.getDate()+1);
+    }
+    if(filter==="year"){
+      const mo=[]; let lm=-1;
+      for(const p of pts){const m=p.date.getMonth();if(m!==lm){mo.push({...p});lm=m;}else mo[mo.length-1]={...p};}
+      return {points:mo,periodLabel:label};
+    }
+    return {points:pts,periodLabel:label};
+  },[txs,filter,offset]);
+
+  const W=340,H=110,P=12;
+  const toX=i=>P+(i/(Math.max(points.length-1,1)))*(W-P*2);
+  const vals=points.map(p=>p.bal);
+  const mn=Math.min(...(vals.length?vals:[0])), mx=Math.max(...(vals.length?vals:[0])), range=mx-mn||1;
   const toY=v=>H-P-((v-mn)/range)*(H-P*2);
-  const pathD=points.map((p,i)=>`${i===0?"M":"L"}${toX(i)},${toY(p.bal)}`).join(" ");
-  const step=Math.ceil(points.length/5);
+
+  function smoothPath(pts){
+    if(!pts.length) return "";
+    if(pts.length===1) return `M${toX(0)},${toY(pts[0].bal)}`;
+    let d=`M${toX(0)},${toY(pts[0].bal)}`;
+    for(let i=1;i<pts.length;i++){
+      const x0=toX(i-1),y0=toY(pts[i-1].bal),x1=toX(i),y1=toY(pts[i].bal),cx=(x0+x1)/2;
+      d+=` C${cx},${y0} ${cx},${y1} ${x1},${y1}`;
+    }
+    return d;
+  }
+
+  const pathD=smoothPath(points);
+  const areaD=points.length>1?pathD+` L${toX(points.length-1)},${H} L${toX(0)},${H} Z`:"";
+  const chartStroke=T.isDark?T.accentText:T.accent;
+  const chartLabel=T.isDark?T.sub:"#555550";
+  const step=Math.max(1,Math.ceil(points.length/5));
+
+  function handleInteract(e){
+    if(!svgRef.current||!points.length) return;
+    e.preventDefault();
+    const rect=svgRef.current.getBoundingClientRect();
+    const cx=e.touches?e.touches[0].clientX:e.clientX;
+    const relX=(cx-rect.left)*(W/rect.width);
+    let closest=0,minD=Infinity;
+    points.forEach((p,i)=>{const d=Math.abs(toX(i)-relX);if(d<minD){minD=d;closest=i;}});
+    const p=points[closest];
+    if(p) setTooltip({x:toX(closest),y:toY(p.bal),label:p.label,bal:p.bal});
+  }
+
+  const isFuture=offset>=0;
+
   return (
-    <div style={{overflowX:"auto"}}>
-      <svg width={W} height={H+24} style={{display:"block",margin:"0 auto"}}>
-        <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={T.accent} stopOpacity="0.3"/><stop offset="100%" stopColor={T.accent} stopOpacity="0"/></linearGradient></defs>
-        <path d={pathD+` L${toX(points.length-1)},${H} L${toX(0)},${H} Z`} fill="url(#lg)"/>
-        <path d={pathD} fill="none" stroke={T.accentText} strokeWidth="2" strokeLinejoin="round"/>
-        {points.map((p,i)=><circle key={i} cx={toX(i)} cy={toY(p.bal)} r="2" fill={T.accentText}/>)}
-        {points.filter((_,i)=>i%step===0||i===points.length-1).map((p,i)=>(
-          <text key={i} x={toX(points.indexOf(p))} y={H+16} textAnchor="middle" fontSize="8" fill={T.sub}>{p.label}</text>
-        ))}
-      </svg>
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6,paddingX:4}}>
+        <button onClick={()=>onOffsetChange(offset-1)} style={{background:"none",border:"none",color:chartLabel,fontSize:18,cursor:"pointer",padding:"0 4px",lineHeight:1}}>‹</button>
+        <div style={{fontSize:11,color:chartLabel,fontWeight:600,textAlign:"center"}}>{periodLabel}</div>
+        <button onClick={()=>onOffsetChange(Math.min(offset+1,0))} style={{background:"none",border:"none",color:offset>=0?T.border:chartLabel,fontSize:18,cursor:offset>=0?"not-allowed":"pointer",padding:"0 4px",lineHeight:1}}>›</button>
+      </div>
+      {!points.length?(
+        <div style={{textAlign:"center",color:chartLabel,fontSize:13,padding:"20px 0"}}>Pas de données pour cette période</div>
+      ):(
+        <div style={{position:"relative",userSelect:"none"}}
+          onTouchStart={handleInteract} onTouchMove={handleInteract}
+          onTouchEnd={()=>setTimeout(()=>setTooltip(null),1800)}
+          onMouseMove={handleInteract} onMouseLeave={()=>setTooltip(null)}>
+          <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H+20}`} style={{display:"block",overflow:"visible"}}>
+            <defs>
+              <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={chartStroke} stopOpacity="0.4"/>
+                <stop offset="100%" stopColor={chartStroke} stopOpacity="0.02"/>
+              </linearGradient>
+            </defs>
+            {areaD&&<path d={areaD} fill="url(#cg)"/>}
+            {pathD&&<path d={pathD} fill="none" stroke={chartStroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>}
+            {points.filter((_,i)=>i%step===0||i===points.length-1).map((p,_,arr,i=points.indexOf(p))=>(
+              <text key={i} x={toX(i)} y={H+15} textAnchor="middle" fontSize="7.5" fill={chartLabel}>{p.label}</text>
+            ))}
+            {tooltip&&(
+              <>
+                <line x1={tooltip.x} y1={P} x2={tooltip.x} y2={H} stroke={chartStroke} strokeWidth="1" strokeDasharray="3,2" opacity="0.6"/>
+                <circle cx={tooltip.x} cy={tooltip.y} r="4" fill={chartStroke} stroke={T.isDark?"#020303":"#fff"} strokeWidth="2"/>
+                <g transform={`translate(${Math.min(Math.max(tooltip.x-52,2),W-106)},${Math.max(tooltip.y-42,2)})`}>
+                  <rect width="104" height="30" rx="6" fill={T.isDark?"#0D1A0D":"#141411"} opacity="0.93"/>
+                  <text x="8" y="12" fontSize="8" fill={T.isDark?T.sub:"#888884"}>{tooltip.label}</text>
+                  <text x="8" y="24" fontSize="11" fontWeight="700" fill={T.isDark?T.accentText:T.accent}>{fmt(tooltip.bal)}</text>
+                </g>
+              </>
+            )}
+          </svg>
+        </div>
+      )}
     </div>
   );
 }
@@ -445,40 +536,245 @@ function EnvBar({ env, balance, maxBalance }) {
   );
 }
 
+// ─── SWIPE DELETE HOOK ────────────────────────────────────────────────────────
+function useSwipeDelete(onDelete) {
+  const [swipeX, setSwipeX] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const isHoriz = useRef(false);
+  const OPEN_THRESHOLD = 50;
+  const OPEN_SNAP = 72;
+
+  function onTouchStart(e) {
+    startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
+    isHoriz.current = false;
+    setSwiping(true);
+  }
+  function onTouchMove(e) {
+    const dx = e.touches[0].clientX - startX.current;
+    const dy = e.touches[0].clientY - startY.current;
+    if (!isHoriz.current) {
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) isHoriz.current = true;
+      else if (Math.abs(dy) > 8) { setSwiping(false); return; }
+    }
+    if (isHoriz.current && dx < 0) {
+      e.stopPropagation();
+      setSwipeX(Math.max(dx, -OPEN_SNAP));
+    } else if (isHoriz.current && dx > 0 && swipeX < 0) {
+      setSwipeX(Math.min(0, swipeX + dx));
+    }
+  }
+  function onTouchEnd() {
+    setSwiping(false);
+    setSwipeX(prev => prev < -OPEN_THRESHOLD ? -OPEN_SNAP : 0);
+  }
+  function close() { setSwipeX(0); }
+  const isOpen = swipeX <= -OPEN_SNAP + 4;
+
+  return { swipeX, swiping, isOpen, onTouchStart, onTouchMove, onTouchEnd, close };
+}
+
 // ─── TX ROW ───────────────────────────────────────────────────────────────────
 function TxRow({ tx, onDelete, subcats, envelopes, incomeRules, last }) {
-  const [open,setOpen]=useState(false);
-  const isInc=tx.type==="income";
-  const sc=subcats.find(s=>s.id===tx.subcatId);
-  const env=envelopes.find(e=>e.id===sc?.envelopeId);
-  const rule=incomeRules[tx.incomeType];
+  const [open, setOpen] = useState(false);
+  const { swipeX, swiping, isOpen, onTouchStart, onTouchMove, onTouchEnd, close: swClose } = useSwipeDelete(onDelete);
+  const isInc = tx.type === "income";
+  const sc = subcats.find(s => s.id === tx.subcatId);
+  const env = envelopes.find(e => e.id === sc?.envelopeId);
+  const rule = incomeRules[tx.incomeType];
+
   return (
-    <div>
-      <div onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",cursor:"pointer",borderBottom:(!last||open)?`1px solid ${T.border}`:"none"}}>
-        <div style={{width:42,height:42,borderRadius:13,background:isInc?"#061510":(env?.bg||"#0A0D12"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-          {isInc?rule?.icon:"💸"}
-        </div>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:14,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {tx.label||(isInc?rule?.label:sc?.label||"Dépense")}
-          </div>
-          <div style={{fontSize:12,color:T.sub,display:"flex",gap:6,alignItems:"center"}}>
-            {!isInc&&env&&<span style={{color:envTextColor(env.color),fontSize:8}}>●</span>}
-            {!isInc&&<span>{sc?.label}</span>}
-            <span>{fmtD(tx.date)}</span>
-            {tx.recur&&tx.recur!=="none"&&<span style={{color:T.accentText}}>🔄</span>}
-          </div>
-        </div>
-        <div style={{fontSize:15,fontWeight:800,color:isInc?T.accentText:"#F87171",flexShrink:0,fontFamily:"monospace"}}>{isInc?"+":"−"}{fmt(tx.amount)}</div>
+    <div style={{position:"relative",overflow:"hidden"}}>
+      {/* Delete button revealed on swipe */}
+      <div style={{position:"absolute",right:0,top:0,bottom:0,width:isOpen?72:0,background:"#DC2626",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",transition:swiping?"none":"width .2s ease"}}
+        onClick={()=>{ swClose(); onDelete(tx.id); }}>
+        <span style={{fontSize:20}}>🗑</span>
       </div>
-      {open&&(
-        <div style={{background:T.card2,padding:"10px 16px",borderBottom:`1px solid ${T.border}`}}>
-          {tx.note&&<div style={{fontSize:12,color:T.sub,marginBottom:6}}>📝 {tx.note}</div>}
-          {isInc&&rule&&<div style={{fontSize:12,marginBottom:6}}>{Object.entries(rule.split).filter(([,p])=>p>0).map(([k,p])=>{ const e=envelopes.find(x=>x.id===k); return <span key={k} style={{marginRight:8,color:e?.color}}>{e?.label} {fmt(tx.amount*p/100)}</span>; })}</div>}
-          {tx.recur&&tx.recur!=="none"&&<div style={{fontSize:12,color:T.accentText,marginBottom:6}}>🔄 {RECUR_OPTIONS.find(r=>r.id===tx.recur)?.label}</div>}
-          <button onClick={()=>onDelete(tx.id)} style={{fontSize:12,color:"#F87171",background:"none",border:"none",cursor:"pointer",padding:0,fontWeight:700}}>🗑 Supprimer</button>
+      {/* Row content */}
+      <div
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        style={{transform:`translateX(${swipeX}px)`,transition:swiping?"none":"transform .2s ease",background:T.card,position:"relative",zIndex:1}}>
+        <div onClick={()=>{ if(swipeX<0){swClose();return;} setOpen(!open); }}
+          style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",cursor:"pointer",borderBottom:(!last||open)?`1px solid ${T.border}`:"none"}}>
+          <div style={{width:42,height:42,borderRadius:13,background:isInc?T.isDark?"#061510":T.card2:(env?.bg||T.muted),display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+            {isInc?rule?.icon:"💸"}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              {tx.label||(isInc?rule?.label:sc?.label||"Dépense")}
+            </div>
+            <div style={{fontSize:12,color:T.sub,display:"flex",gap:6,alignItems:"center"}}>
+              {!isInc&&env&&<span style={{color:envTextColor(env.color),fontSize:8}}>●</span>}
+              {!isInc&&<span>{sc?.label}</span>}
+              <span>{fmtD(tx.date)}</span>
+              {tx.recur&&tx.recur!=="none"&&<span style={{color:T.accentText}}>🔄</span>}
+            </div>
+          </div>
+          <div style={{fontSize:15,fontWeight:800,color:isInc?T.accentText:"#F87171",flexShrink:0,fontFamily:"monospace"}}>{isInc?"+":"−"}{fmt(tx.amount)}</div>
         </div>
-      )}
+        {open&&(
+          <div style={{background:T.card2,padding:"10px 16px",borderBottom:`1px solid ${T.border}`}}>
+            {tx.note&&<div style={{fontSize:12,color:T.sub,marginBottom:6}}>📝 {tx.note}</div>}
+            {isInc&&rule&&<div style={{fontSize:12,marginBottom:6}}>{Object.entries(rule.split).filter(([,p])=>p>0).map(([k,p])=>{ const e=envelopes.find(x=>x.id===k); return <span key={k} style={{marginRight:8,color:e?.color}}>{e?.label} {fmt(tx.amount*p/100)}</span>; })}</div>}
+            {tx.recur&&tx.recur!=="none"&&<div style={{fontSize:12,color:T.accentText,marginBottom:6}}>🔄 {RECUR_OPTIONS.find(r=>r.id===tx.recur)?.label}</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RecurRow({ re, subcats, envelopes, onPay, onToggle, onDelete }) {
+  const sc=subcats.find(s=>s.id===re.subcatId);
+  const env=envelopes.find(e=>e.id===sc?.envelopeId);
+  const days=daysUntil(re.nextDate);
+  const urgent=days<=3&&days>=0;
+  const overdue=days<0;
+  const sw=useSwipeDelete(()=>onDelete(re.id));
+  const [paid, setPaid] = useState(false);
+  function handlePay() {
+    onPay(re);
+    setPaid(true);
+    setTimeout(()=>setPaid(false), 1500);
+  }
+  return (
+    <div style={{position:"relative",overflow:"hidden",borderRadius:14,marginBottom:10}}>
+      <div style={{position:"absolute",right:0,top:0,bottom:0,width:sw.isOpen?72:0,background:"#DC2626",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",borderRadius:"0 14px 14px 0",overflow:"hidden",transition:sw.swiping?"none":"width .2s ease"}}
+        onClick={()=>{ sw.close(); onDelete(re.id); }}>
+        <span style={{fontSize:20}}>🗑</span>
+      </div>
+      <div onTouchStart={sw.onTouchStart} onTouchMove={sw.onTouchMove} onTouchEnd={sw.onTouchEnd}
+        onClick={()=>{ if(sw.isOpen) sw.close(); }}
+        style={{transform:`translateX(${sw.swipeX}px)`,transition:sw.swiping?"none":"transform .2s ease",background:T.card,borderRadius:14,padding:"14px 16px",border:`1.5px solid ${overdue?"#F87171":urgent?"#FBBF24":T.border}`,opacity:re.active?1:0.5,position:"relative",zIndex:1}}>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:8}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:700,color:T.text}}>{re.label}</div>
+            <div style={{fontSize:11,color:T.sub,marginTop:2,display:"flex",gap:8,alignItems:"center"}}>
+              {env&&<span style={{color:envTextColor(env.color)}}>● {env.label}</span>}
+              <span>{sc?.label}</span>
+              <span>· {RECUR_OPTIONS.find(r=>r.id===re.period)?.label}</span>
+            </div>
+          </div>
+          <div style={{fontSize:17,fontWeight:800,color:"#F87171",marginLeft:8}}>{fmt(re.amount)}</div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <div style={{fontSize:12,color:overdue?"#F87171":urgent?"#FBBF24":T.sub}}>
+            {overdue?`En retard de ${Math.abs(days)}j`:days===0?"Aujourd'hui !":urgent?`Dans ${days}j`:`Prochain : ${new Date(re.nextDate).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}`}
+          </div>
+          {(overdue||urgent)&&<div style={{width:8,height:8,borderRadius:"50%",background:overdue?"#F87171":"#FBBF24"}}/>}
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <button onClick={handlePay} disabled={!re.active||paid} style={{flex:1,padding:"8px 0",borderRadius:10,border:"none",background:paid?"#34D399":re.active?T.accent:T.muted,color:paid?"#020303":re.active?T.accentBtn:T.sub,fontSize:12,fontWeight:700,cursor:re.active?"pointer":"default",transition:"all .2s"}}>
+            {paid?"✅ Payé !":"✓ Payer maintenant"}
+          </button>
+          <button onClick={()=>onToggle(re.id)} style={{padding:"8px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:"none",color:re.active?"#FBBF24":T.sub,fontSize:11,fontWeight:600,cursor:"pointer"}}>
+            {re.active?"Pause":"Activer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+function daysUntil(dateStr) {
+  const diff = new Date(dateStr) - new Date();
+  return Math.ceil(diff/(1000*60*60*24));
+}
+
+// ─── FEEDBACK HOOK ────────────────────────────────────────────────────────────
+function useFeedback(msg, duration=1500) {
+  const [shown, setShown] = useState(false);
+  function trigger() { setShown(true); setTimeout(()=>setShown(false), duration); }
+  return [shown, trigger, shown ? msg : null];
+}
+function EnvRow({ env, isLast, editingColor, editingEnv, editingLabel, setEC, setEEv, setEL, inp, safeSetEnv, envelopes, subcats, setSub, setIR, setBal, setEnvMax }) {
+  const sw = useSwipeDelete(()=>{});
+  const canDelete = !env.system && envelopes.length>1;
+  function doDelete() {
+    const delId=env.id;
+    safeSetEnv(envelopes.filter(x=>x.id!==delId));
+    setSub(subcats.filter(s=>s.envelopeId!==delId));
+    setIR(rules=>Object.fromEntries(Object.entries(rules).map(([k,r])=>{const{[delId]:_,...rest}=r.split;return[k,{...r,split:rest}];})));
+    setBal(b=>{const{[delId]:_,...rest}=b;return rest;});
+    setEnvMax(m=>{const{[delId]:_,...rest}=m;return rest;});
+  }
+  return (
+    <div style={{position:"relative",overflow:"hidden"}}>
+      {canDelete&&<div style={{position:"absolute",right:0,top:0,bottom:0,width:sw.isOpen?72:0,background:"#DC2626",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",transition:sw.swiping?"none":"width .2s ease"}} onClick={()=>{sw.close();doDelete();}}><span style={{fontSize:20}}>🗑</span></div>}
+      <div onTouchStart={canDelete?sw.onTouchStart:undefined} onTouchMove={canDelete?sw.onTouchMove:undefined} onTouchEnd={canDelete?sw.onTouchEnd:undefined}
+        style={{transform:`translateX(${sw.swipeX}px)`,transition:sw.swiping?"none":"transform .2s ease",background:T.card,position:"relative",zIndex:1}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderBottom:(isLast&&editingColor!==env.id)?undefined:`1px solid ${T.border}`}}>
+          <div onClick={()=>setEC(editingColor===env.id?null:env.id)} style={{width:22,height:22,borderRadius:"50%",background:env.color,flexShrink:0,cursor:"pointer",border:editingColor===env.id?`2px solid ${T.text}`:"2px solid transparent",transition:"border .15s"}}/>
+          {editingEnv===env.id&&!env.system?(
+            <input value={editingLabel} onChange={e=>setEL(e.target.value)} onBlur={()=>{safeSetEnv(envelopes.map(x=>x.id===env.id?{...x,label:editingLabel}:x));setEEv(null);}} autoFocus style={{...inp,flex:1,padding:"4px 8px",fontSize:14}}/>
+          ):(
+            <div style={{flex:1}} onClick={()=>{if(!env.system){setEEv(env.id);setEL(env.label);}}}>
+              <div style={{fontSize:14,fontWeight:600,color:T.text,display:"flex",alignItems:"center",gap:6}}>{env.label}{env.system&&<span style={{fontSize:9,color:T.sub,background:T.muted,padding:"2px 6px",borderRadius:6,fontWeight:700,letterSpacing:0.5}}>SYSTÈME</span>}</div>
+              <div style={{fontSize:10,color:T.sub,marginTop:1}}>{env.system?"Non modifiable — rôle réservé":"Tap sur le point pour changer la couleur"}</div>
+            </div>
+          )}
+          {env.system&&<span style={{fontSize:11,color:T.sub,padding:"0 4px",fontWeight:600}}>🔒</span>}
+        </div>
+        {editingColor===env.id&&(
+          <div style={{padding:"10px 16px 14px",background:T.bg,borderBottom:`1px solid ${T.border}`}}>
+            <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>CHOISIR UNE COULEUR</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+              {["#F87171","#FBBF24","#34D399","#B4FF00","#60A5FA","#A78BFA","#F472B6","#FB923C","#94A3B8","#E2E8F0","#818CF8","#2DD4BF"].map(c=>(
+                <button key={c} onClick={()=>safeSetEnv(prev=>prev.map(x=>x.id===env.id?{...x,color:c,bg:c+"22"}:x))} style={{width:28,height:28,borderRadius:"50%",background:c,border:env.color===c?`3px solid ${T.text}`:"3px solid transparent",cursor:"pointer",flexShrink:0}}/>
+              ))}
+              <div style={{position:"relative",width:28,height:28}}>
+                <input type="color" value={env.color} onChange={e=>{const val=e.target.value;safeSetEnv(prev=>prev.map(x=>x.id===env.id?{...x,color:val,bg:val+"22"}:x));}} style={{width:"100%",height:"100%",borderRadius:"50%",border:"none",cursor:"pointer",padding:0,background:"none"}}/>
+              </div>
+            </div>
+            <button onClick={()=>setEC(null)} style={{fontSize:12,color:T.accentText,background:"none",border:"none",cursor:"pointer",fontWeight:700}}>✓ Fermer</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SubcatRow({ sc, env, subcats, setSub, editingSubcat, setESC, editingSubLabel, setESL, isLast }) {
+  const sw = useSwipeDelete(()=>{});
+  function doDelete() { setSub(subcats.filter(x=>x.id!==sc.id)); }
+  return (
+    <div style={{position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",right:0,top:0,bottom:0,width:sw.isOpen?72:0,background:"#DC2626",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",transition:sw.swiping?"none":"width .2s ease"}} onClick={()=>{sw.close();doDelete();}}><span style={{fontSize:20}}>🗑</span></div>
+      <div onTouchStart={sw.onTouchStart} onTouchMove={sw.onTouchMove} onTouchEnd={sw.onTouchEnd}
+        style={{transform:`translateX(${sw.swipeX}px)`,transition:sw.swiping?"none":"transform .2s ease",background:T.card,position:"relative",zIndex:1}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:isLast?undefined:`1px solid ${T.border}`}}>
+          <span style={{width:8,height:8,borderRadius:"50%",background:env.color,flexShrink:0}}/>
+          {editingSubcat===sc.id?(
+            <input value={editingSubLabel} onChange={e=>setESL(e.target.value)} onBlur={()=>{if(editingSubLabel.trim())setSub(subcats.map(x=>x.id===sc.id?{...x,label:editingSubLabel.trim()}:x));setESC(null);}} onKeyDown={e=>{if(e.key==="Enter")e.target.blur();}} autoFocus style={{flex:1,padding:"3px 6px",borderRadius:6,border:`1px solid ${env.color}60`,background:T.bg,color:T.text,fontSize:14,outline:"none"}}/>
+          ):(
+            <div onClick={()=>{setESC(sc.id);setESL(sc.label);}} style={{flex:1,fontSize:14,color:T.text,cursor:"pointer"}}>{sc.label}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IRRow({ k, r, incomeRules, setIR, editingIR, setEIR, editingIRLabel, setEIRL, envelopes }) {
+  const canDelete = Object.keys(incomeRules).length > 1;
+  const sw = useSwipeDelete(()=>{});
+  function doDelete() { setIR(rules=>{ const n={...rules}; delete n[k]; return n; }); }
+  return (
+    <div style={{position:"relative",overflow:"hidden",marginBottom:16,borderRadius:8}}>
+      {canDelete&&<div style={{position:"absolute",right:0,top:0,bottom:0,width:sw.isOpen?72:0,background:"#DC2626",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",borderRadius:sw.isOpen?"0 8px 8px 0":0,overflow:"hidden",transition:sw.swiping?"none":"width .2s ease"}} onClick={()=>{sw.close();doDelete();}}><span style={{fontSize:20}}>🗑</span></div>}
+      <div onTouchStart={canDelete?sw.onTouchStart:undefined} onTouchMove={canDelete?sw.onTouchMove:undefined} onTouchEnd={canDelete?sw.onTouchEnd:undefined}
+        style={{transform:`translateX(${sw.swipeX}px)`,transition:sw.swiping?"none":"transform .2s ease",position:"relative",zIndex:1}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+          <span style={{fontSize:18}}>{r.icon}</span>
+          {editingIR===k?(
+            <input value={editingIRLabel} onChange={e=>setEIRL(e.target.value)} onBlur={()=>{if(editingIRLabel.trim())setIR(rules=>({...rules,[k]:{...rules[k],label:editingIRLabel.trim()}}));setEIR(null);}} onKeyDown={e=>{if(e.key==="Enter")e.target.blur();}} autoFocus style={{flex:1,padding:"3px 6px",borderRadius:6,border:`1px solid ${r.color}60`,background:T.bg,color:T.text,fontSize:14,fontWeight:700,outline:"none"}}/>
+          ):(
+            <span onClick={()=>{setEIR(k);setEIRL(r.label);}} style={{fontSize:14,fontWeight:700,color:T.text,cursor:"pointer",flex:1}}>{r.label}</span>
+          )}
+        </div>
+        <SplitEditor key={k} ruleKey={k} rule={r} envelopes={envelopes} setIncomeRules={setIR}/>
+      </div>
     </div>
   );
 }
@@ -486,23 +782,21 @@ function TxRow({ tx, onDelete, subcats, envelopes, incomeRules, last }) {
 // ─── SPLIT EDITOR ─────────────────────────────────────────────────────────────
 function SplitEditor({ ruleKey, rule, envelopes, setIncomeRules }) {
   const envIds = envelopes.map(e=>e.id);
-  // Purge any keys from rule.split that no longer correspond to an existing envelope
   const cleanSplit = Object.fromEntries(envIds.map(id => [id, rule.split[id] ?? 0]));
   const [splits,setSplits]=useState(cleanSplit);
+  const [applied, setApplied] = useState(false);
 
-  // Re-sync if envelopes change (e.g. one was deleted) — drop orphaned keys, keep valid ones
   useEffect(() => {
     setSplits(prev => Object.fromEntries(envIds.map(id => [id, prev[id] ?? rule.split[id] ?? 0])));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [envIds.join(",")]);
 
   const total=Object.values(splits).reduce((a,v)=>a+(parseFloat(v)||0),0);
   const valid=Math.round(total)===100;
   function apply(){
     if(!valid) return;
-    // Only keep keys for envelopes that currently exist
     const purged = Object.fromEntries(envIds.map(id=>[id, parseFloat(splits[id])||0]));
     setIncomeRules(r=>({...r,[ruleKey]:{...r[ruleKey],split:purged}}));
+    setApplied(true); setTimeout(()=>setApplied(false),1500);
   }
   return (
     <div style={{background:T.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${T.border}`,marginBottom:8}}>
@@ -520,8 +814,8 @@ function SplitEditor({ ruleKey, rule, envelopes, setIncomeRules }) {
           <span style={{fontSize:12,color:T.sub}}>%</span>
         </div>
       ))}
-      <button onClick={apply} disabled={!valid} style={{width:"100%",padding:"8px 0",borderRadius:10,border:"none",background:valid?T.accent:T.muted,color:valid?T.isDark?"#020303":"#fff":T.sub,fontSize:13,fontWeight:700,cursor:valid?"pointer":"not-allowed",marginTop:4}}>
-        {valid?"✓ Appliquer":"Total doit être 100%"}
+      <button onClick={apply} disabled={!valid||applied} style={{width:"100%",padding:"8px 0",borderRadius:10,border:"none",background:applied?"#34D399":valid?T.accent:T.muted,color:applied?"#020303":valid?T.accentBtn:T.sub,fontSize:13,fontWeight:700,cursor:valid?"pointer":"not-allowed",marginTop:4,transition:"all .2s"}}>
+        {applied?"✅ Répartition sauvée !":valid?"✓ Appliquer":"Total doit être 100%"}
       </button>
     </div>
   );
@@ -533,7 +827,9 @@ function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) 
   const [useModal,setUseModal] = useState(false);
   const [useAmt,setUseAmt]     = useState(String(fund.current));
   const [useLabel,setUseLabel] = useState(fund.label);
-  const [afterAction,setAfterAction] = useState("close"); // "close" | "reset"
+  const [afterAction,setAfterAction] = useState("close");
+  const [addFeedback, setAddFeedback] = useState(false);
+  const sw = useSwipeDelete(()=>onDelete(fund.id));
 
   const pct       = Math.min(100,Math.round((fund.current/fund.goal)*100));
   const remaining = fund.goal - fund.current;
@@ -546,7 +842,16 @@ function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) 
   const isGoalReached = pct >= 100;
 
   return (
-    <div style={{background:T.card2,borderRadius:14,padding:"14px 16px",border:`1px solid ${isGoalReached?T.accent+"60":T.border}`,marginBottom:10,position:"relative"}}>
+    <div style={{position:"relative",overflow:"hidden",borderRadius:14,marginBottom:10}}>
+      {/* Delete bg */}
+      <div style={{position:"absolute",right:0,top:0,bottom:0,width:sw.isOpen?72:0,background:"#DC2626",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",borderRadius:sw.isOpen?"0 14px 14px 0":0,overflow:"hidden",transition:sw.swiping?"none":"width .2s ease"}}
+        onClick={()=>{ sw.close(); onDelete(fund.id); }}>
+        <span style={{fontSize:20}}>🗑</span>
+      </div>
+      {/* Card content */}
+      <div onTouchStart={sw.onTouchStart} onTouchMove={sw.onTouchMove} onTouchEnd={sw.onTouchEnd}
+        style={{transform:`translateX(${sw.swipeX}px)`,transition:sw.swiping?"none":"transform .2s ease",position:"relative",zIndex:1}}>
+    <div style={{background:T.card2,borderRadius:14,padding:"14px 16px",border:`1px solid ${isGoalReached?T.accent+"60":T.border}`}}>
 
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -555,7 +860,6 @@ function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) 
           {monthsLeft&&pct<100&&<div style={{fontSize:11,color:T.sub,marginTop:2}}>~{monthsLeft} mois restants</div>}
           {isGoalReached&&<div style={{fontSize:11,color:"#5FD34A",marginTop:2,fontWeight:600}}>Objectif atteint 🎉</div>}
         </div>
-        <button onClick={()=>onDelete(fund.id)} style={{background:"none",border:"none",color:"#F87171",cursor:"pointer",fontSize:16,padding:0}}>×</button>
       </div>
 
       {/* Montants + barre */}
@@ -576,9 +880,11 @@ function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) 
               placeholder={sfDisponible>0?`Max ${fmt(sfDisponible)}`:"Trésorerie épuisée"}
               disabled={sfDisponible<=0}
               style={{flex:1,padding:"7px 10px",borderRadius:9,border:`1px solid ${errMsg?"#F87171":canAdd?T.accent:T.border}`,background:T.bg,color:sfDisponible>0?T.text:T.sub,fontSize:13,outline:"none"}}/>
-            <button onClick={()=>{ if(!canAdd)return; onAdd(fund.id,inputAmt); setAddAmt(""); }}
+            <button onClick={()=>{ if(!canAdd)return; onAdd(fund.id,inputAmt); setAddAmt(""); setAddFeedback(true); setTimeout(()=>setAddFeedback(false),1500); }}
               disabled={!canAdd}
-              style={{padding:"7px 14px",borderRadius:9,border:"none",background:canAdd?"#B4FF00":T.muted,color:canAdd?"#050607":T.sub,fontSize:12,fontWeight:700,cursor:canAdd?"pointer":"not-allowed"}}>+</button>
+              style={{padding:"7px 14px",borderRadius:9,border:"none",background:addFeedback?"#34D399":canAdd?T.accent:T.muted,color:addFeedback?"#020303":canAdd?T.accentBtn:T.sub,fontSize:12,fontWeight:700,cursor:canAdd?"pointer":"not-allowed",transition:"all .2s",minWidth:40}}>
+              {addFeedback?"✅":"+"}
+            </button>
           </div>
           {errMsg&&<div style={{fontSize:11,color:"#F87171",marginBottom:6}}>{errMsg}</div>}
         </>
@@ -644,6 +950,8 @@ function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) 
         </div>
       )}
     </div>
+      </div>
+    </div>
   );
 }
 
@@ -670,7 +978,7 @@ const I18N = {
     currencyEx:"💡 Si tu es à Madagascar, choisis Ariary. À Dakar ou Abidjan, choisis XOF.",
     envelopes:"Tes enveloppes",
     envelopesSub:"La Trésorerie est toujours incluse — c'est ta réserve intouchable.",
-    envelopesEx:"💡 Une enveloppe = une grande catégorie de ta vie. Ex : Survie (nourriture, loyer), Opérationnel (travail), Différable (loisirs).",
+    envelopesEx:"💡 Une enveloppe = une grande catégorie de ta vie. Ex : Survie (nourriture, loyer), Opérationnel (travail), Différable (loisirs), Donation (dîme, aider les autres).",
     envelopesAdd:"Nouvelle enveloppe…",
     subcats:"Tes sous-catégories",
     subcatsSub:"Détaille chaque enveloppe selon tes dépenses réelles.",
@@ -725,10 +1033,13 @@ const I18N = {
 };
 
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────
-const OB_STEPS_CREATE = ["welcome","langue","profil","devise","enveloppes","subcats","revenus"];
+const OB_STEPS_CREATE = ["welcome","profil","devise","enveloppes","subcats","revenus"];
 const OB_STEPS_IMPORT = ["welcome","import_confirm"];
 
 function OnboardingScreen({ onComplete, prefillName="" }) {
+  // Onboarding is always dark — override global T for this component's render
+  T = DARK_THEME;
+
   const [mode, setMode]   = useState(null); // null | "create" | "import"
   const [step, setStep]   = useState(0);
   const [lang, setLang]   = useState("fr");
@@ -745,6 +1056,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
     { id:"survie",       label:"Survie",       color:"#F87171" },
     { id:"operationnel", label:"Opérationnel", color:"#34D399" },
     { id:"differable",   label:"Différable",   color:"#94A3B8" },
+    { id:"donation",     label:"Donation",     color:"#F59E0B" },
   ]);
   const [newEnvLabel, setNEL] = useState("");
   const [newEnvColor, setNEC] = useState("#B4FF00");
@@ -753,6 +1065,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
     survie:       ["Repas","Transport","Eau","Électricité","Hygiène","Téléphone"],
     operationnel: ["Data","Déplacement client","Matériel"],
     differable:   ["Loisirs","Vêtements","Cadeaux"],
+    donation:     ["Dîme","Don ponctuel","Aide famille"],
   });
   const [newScLabels, setNewScLabels] = useState({});
 
@@ -760,9 +1073,9 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
   const makeDefaultSplit = () => Object.fromEntries(allEnvIds().map(id=>[id,0]));
   const [rules, setRules] = useState([
     { key:"revenu1", label:"Revenu régulier", icon:"🏠", color:"#B4FF00",
-      split:{ tresorerie:30, survie:60, operationnel:10, differable:0 } },
+      split:{ tresorerie:20, survie:60, operationnel:10, differable:0, donation:10 } },
     { key:"revenu2", label:"Revenu variable",  icon:"💼", color:"#A78BFA",
-      split:{ tresorerie:50, survie:0,  operationnel:30, differable:20 } },
+      split:{ tresorerie:45, survie:0,  operationnel:30, differable:15, donation:10 } },
   ]);
 
   const allRulesValid = rules.every(r=>{
@@ -770,8 +1083,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
     return Math.round(tot)===100;
   });
 
-  const canNext = step_id==="langue"       ? true
-    : step_id==="profil"       ? pName.trim().length>0
+  const canNext = step_id==="profil"       ? pName.trim().length>0
     : step_id==="devise"       ? true
     : step_id==="enveloppes"   ? envs.length>0
     : step_id==="subcats"      ? true
@@ -810,7 +1122,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
     const fullEnvs = [TRES,...envs.map(e=>({...e,bg:T.card2}))];
     const irObj = {};
     rules.forEach(r=>{ irObj[r.key]={ label:r.label, icon:r.icon, color:r.color, split:r.split }; });
-    const subcats = [{ id:"reserve", label:"Mise en réserve", envelopeId:"tresorerie" }];
+    const subcats = [];
     envs.forEach(e=>{ (subcatMap[e.id]||[]).forEach(lbl=>subcats.push({ id:uid(), label:lbl, envelopeId:e.id })); });
     onComplete({ name:pName.trim(), currency, lang, envelopes:fullEnvs, incomeRules:irObj, subcats, imported:null });
   }
@@ -894,20 +1206,6 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
             </>
           )}
 
-          {step_id==="langue"&&(
-            <>
-              <div style={{fontSize:22,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.lang}</div>
-              <div style={{fontSize:13,color:"#3A6040",marginBottom:20}}>{t.langSub}</div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {Object.entries(LANGS).map(([code,label])=>(
-                  <button key={code} onClick={()=>setLang(code)} style={{padding:"14px 16px",borderRadius:12,border:`1.5px solid ${lang===code?T.accent:T.border}`,background:lang===code?T.card2:T.card,color:lang===code?T.accent:T.text,fontSize:15,fontWeight:lang===code?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    {label}{lang===code&&<span style={{color:T.accentText}}>✓</span>}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
           {step_id==="profil"&&(
             <>
               <div style={{fontSize:22,fontWeight:800,color:"#E8FFD4",marginBottom:6}}>{t.name}</div>
@@ -925,7 +1223,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
               <ExBox text={t.currencyEx}/>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {CURRENCIES.map(c=>(
-                  <button key={c.code} onClick={()=>setCur(c.code)} style={{padding:"13px 16px",borderRadius:12,border:`1.5px solid ${currency===c.code?T.accent:T.border}`,background:currency===c.code?T.card2:T.card,color:currency===c.code?T.accent:T.text,fontSize:13,fontWeight:currency===c.code?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <button key={c.code} onClick={()=>setCur(c.code)} style={{padding:"13px 16px",borderRadius:12,border:`1.5px solid ${currency===c.code?T.chipBg:T.border}`,background:currency===c.code?T.chipBg:T.card,color:currency===c.code?T.chipText:T.text,fontSize:13,fontWeight:currency===c.code?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     {c.label}{currency===c.code&&<span style={{color:T.accentText}}>✓</span>}
                   </button>
                 ))}
@@ -948,7 +1246,7 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
                   <div style={{width:12,height:12,borderRadius:"50%",background:e.color,flexShrink:0}}/>
                   <input value={e.label} onChange={ev=>setEnvs(p=>p.map((x,j)=>j===i?{...x,label:ev.target.value}:x))}
                     style={{...inp,flex:1,padding:"10px 12px",fontSize:14}}/>
-                  <button onClick={()=>setEnvs(p=>p.filter((_,j)=>j!==i))} style={{background:"#1A0808",border:"none",color:"#F87171",borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:16,flexShrink:0}}>×</button>
+                  <button onClick={()=>setEnvs(p=>p.filter((_,j)=>j!==i))} style={{background:T.isDark?"#1A0808":"#FEE2E2",border:"none",color:"#F87171",borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:16,flexShrink:0}}>×</button>
                 </div>
               ))}
               <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
@@ -1063,13 +1361,24 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
 }
 
 // ─── PROFILE SETTINGS OVERLAY ────────────────────────────────────────────────
-function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, setSeuils, onToggleTheme, onClose }) {
+function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, setSeuils, setCoussin, onToggleTheme, onClose }) {
   const ps_cur    = pload(ps_pid, "currency", "Ar");
   const ps_lang   = pload(ps_pid, "lang", "fr");
   const ps_seuils = pload(ps_pid, SEUILS_KEY, { alerte:60000, blocage:25000 });
 
   const [custA, setCustA] = useState(String(ps_seuils.alerte||60000));
   const [custB, setCustB] = useState(String(ps_seuils.blocage||25000));
+  const [coussinInput, setCoussinInput] = useState(String(pload(ps_pid,"coussin",100000)));
+  const [coussinApplied, setCoussinApplied] = useState(false);
+  const [seuilsApplied, setSeuilsApplied] = useState(false);
+
+  function applyCoussin() {
+    const v = parseInt(coussinInput) || 100000;
+    psave(ps_pid, "coussin", v);
+    if (ps_pid === pid) setCoussin(v);
+    setCoussinApplied(true);
+    setTimeout(() => setCoussinApplied(false), 1500);
+  }
 
   const profileName = profiles.find(p=>p.id===ps_pid)?.name || "";
 
@@ -1091,6 +1400,7 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
     const s = { presetId:"custom", alerte:parseInt(custA)||60000, blocage:parseInt(custB)||25000 };
     psave(ps_pid, SEUILS_KEY, s);
     if (ps_pid===pid) setSeuils(s);
+    setSeuilsApplied(true); setTimeout(()=>setSeuilsApplied(false),1500);
   }
 
   // Re-read from storage each render so UI reflects changes
@@ -1113,7 +1423,7 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
             const active = T.isDark===opt.id;
             return (
               <button key={String(opt.id)} onClick={()=>{ if(ps_pid===pid) onToggleTheme(); }}
-                style={{flex:1,padding:"12px 10px",borderRadius:12,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.card2:T.card,color:active?T.accent:T.text,fontSize:13,fontWeight:active?700:500,cursor:"pointer",textAlign:"center"}}>
+                style={{flex:1,padding:"12px 10px",borderRadius:12,border:`1.5px solid ${active?T.chipBg:T.border}`,background:active?T.card2:T.card,color:active?T.text:T.sub,fontSize:13,fontWeight:active?700:500,cursor:"pointer",textAlign:"center"}}>
                 <div style={{fontSize:15,marginBottom:2}}>{opt.label}</div>
                 <div style={{fontSize:10,color:T.sub}}>{opt.desc}</div>
               </button>
@@ -1124,21 +1434,20 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
         {/* COUSSIN SÉCURITÉ */}
         <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>COUSSIN DE SÉCURITÉ TRÉSORERIE</div>
         <div style={{background:T.card2,borderRadius:12,padding:"14px",border:`1px solid ${T.border}`,marginBottom:20}}>
-          <div style={{fontSize:12,color:"#3A6040",marginBottom:10,lineHeight:1.5}}>
+          <div style={{fontSize:12,color:T.sub,marginBottom:10,lineHeight:1.5}}>
             Le bouton 🚨 Urgence est bloqué tant que la Trésorerie est en dessous de ce montant.
           </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
             <input type="number"
-              defaultValue={pload(ps_pid,"coussin",100000)}
-              onBlur={e=>{
-                const v=parseInt(e.target.value)||100000;
-                psave(ps_pid,"coussin",v);
-                if(ps_pid===pid) setCoussin(v);
-              }}
-              style={{flex:1,padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.accentText,fontSize:16,fontWeight:800,outline:"none"}}/>
-            <span style={{fontSize:13,color:"#3A6040",fontWeight:600}}>{pload(ps_pid,"currency","Ar")}</span>
+              value={coussinInput}
+              onChange={e=>{ setCoussinInput(e.target.value); setCoussinApplied(false); }}
+              style={{flex:1,padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:16,fontWeight:800,outline:"none"}}/>
+            <span style={{fontSize:13,color:T.sub,fontWeight:600}}>{pload(ps_pid,"currency","Ar")}</span>
           </div>
-          <div style={{fontSize:11,color:"#1E3D22",marginTop:8}}>Idéalement = 3 mois de dépenses de survie</div>
+          <button onClick={applyCoussin} style={{width:"100%",padding:"11px 0",borderRadius:10,border:"none",background:coussinApplied?T.isDark?"#34D399":"#16A34A":T.accent,color:coussinApplied?"#fff":T.accentBtn,fontSize:13,fontWeight:800,cursor:"pointer",transition:"all .2s"}}>
+            {coussinApplied ? "✓ Appliqué !" : "Appliquer"}
+          </button>
+          <div style={{fontSize:11,color:T.sub,marginTop:8}}>Idéalement = 3 mois de dépenses de survie</div>
         </div>
 
         {/* SEUILS */}
@@ -1148,7 +1457,7 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
             const active = cur_seuils.presetId===preset.id;
             return (
               <button key={preset.id} onClick={()=>savePreset(preset)}
-                style={{padding:"12px 14px",borderRadius:12,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.card2:T.card,cursor:"pointer",textAlign:"left"}}>
+                style={{padding:"12px 14px",borderRadius:12,border:`1.5px solid ${active?T.chipBg:T.border}`,background:active?T.card2:T.card,cursor:"pointer",textAlign:"left"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                   <span style={{fontSize:13,fontWeight:700,color:active?T.accentText:T.text}}>{preset.emoji} {preset.label}</span>
                   {active&&<span style={{color:T.accentText,fontSize:12}}>✓</span>}
@@ -1177,8 +1486,8 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
               </div>
             </div>
             <button onClick={saveCustom}
-              style={{width:"100%",padding:"9px 0",borderRadius:8,border:"none",background:"#B4FF00",color:"#020303",fontSize:13,fontWeight:800,cursor:"pointer"}}>
-              Appliquer
+              style={{width:"100%",padding:"9px 0",borderRadius:8,border:"none",background:seuilsApplied?"#34D399":T.accent,color:seuilsApplied?"#020303":T.accentBtn,fontSize:13,fontWeight:800,cursor:"pointer",transition:"all .2s"}}>
+              {seuilsApplied?"✅ Seuils mis à jour !":"Appliquer"}
             </button>
           </div>
         </div>
@@ -1190,7 +1499,7 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
             const active = cur_cur===c.code;
             return (
               <button key={c.code} onClick={()=>saveCurrency(c.code)}
-                style={{padding:"12px 16px",borderRadius:12,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.card2:T.card,color:active?"#B4FF00":T.text,fontSize:13,fontWeight:active?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between"}}>
+                style={{padding:"12px 16px",borderRadius:12,border:`1.5px solid ${active?T.chipBg:T.border}`,background:active?T.card2:T.card,color:active?"#B4FF00":T.text,fontSize:13,fontWeight:active?700:500,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between"}}>
                 {c.label}{active&&<span style={{color:T.accentText}}>✓</span>}
               </button>
             );
@@ -1198,7 +1507,7 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
         </div>
       </div>
       <div style={{padding:"16px 20px 32px"}}>
-        <button onClick={onClose} style={{width:"100%",padding:"13px 0",borderRadius:14,border:"none",background:"#B4FF00",color:"#020303",fontSize:15,fontWeight:800,cursor:"pointer"}}>
+        <button onClick={onClose} style={{width:"100%",padding:"13px 0",borderRadius:14,border:"none",background:T.accent,color:T.accentBtn,fontSize:15,fontWeight:800,cursor:"pointer"}}>
           Fermer
         </button>
       </div>
@@ -1248,9 +1557,9 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
         </div>
 
         {fallbackEnvs.length===0?(
-          <div style={{padding:"12px 14px",borderRadius:12,background:"#1A0808",border:"1px solid #F8717140",marginBottom:16}}>
+          <div style={{padding:"12px 14px",borderRadius:12,background:T.isDark?"#1A0808":"#FEE2E2",border:"1px solid #F8717140",marginBottom:16}}>
             <div style={{fontSize:13,color:"#F87171",fontWeight:600}}>Aucune enveloppe disponible</div>
-            <div style={{fontSize:11,color:"#3A6040",marginTop:4}}>Le manque de {fmt(shortage)} passera en négatif sur {envLabel}.</div>
+            <div style={{fontSize:11,color:T.sub,marginTop:4}}>Le manque de {fmt(shortage)} passera en négatif sur {envLabel}.</div>
           </div>
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
@@ -1403,6 +1712,16 @@ export default function App() {
   // Add form
   const [addMode,setAddMode]   = useState("expense");
   const [amount,setAmount]     = useState("");
+  // ── Button feedbacks ────────────────────────────────────────────────────────
+  const [submitFeedback, setSubmitFeedback] = useState(false);
+  const [payFeedback, setPayFeedback]       = useState(null); // re.id
+  const [sfAddFeedback, setSFAddFeedback]   = useState(null); // fund.id
+  const [sfUseFeedback, setSFUseFeedback]   = useState(null); // fund.id
+  const [addRecurFeedback, setARF]          = useState(false);
+  const [addEnvFeedback, setAEF]            = useState(false);
+  const [addScFeedback, setASCF]            = useState(false);
+  const [addIRFeedback, setAIRF]            = useState(false);
+  function fbFlash(setter, val=true, dur=1500) { setter(val); setTimeout(()=>setter(false), dur); }
   const [incomeType,setIT]     = useState("prestation");
 
   // Keep incomeType pointing to a valid, existing income rule at all times.
@@ -1447,6 +1766,8 @@ export default function App() {
   const [hEnv,setHEnv]         = useState("all");
   const [hSubcat,setHSC]       = useState("all");
   const [chartPeriod,setCP]    = useState("month");
+  const [chartOffset,setCO]    = useState(0);
+  function setChartPeriod(p) { setCP(p); setCO(0); }
 
   // New sinking fund form
   const [sfLabel,setSFL]       = useState("");
@@ -1653,9 +1974,9 @@ export default function App() {
     .reduce((a,e)=>a+(bal[e.id]||0), 0);
   const amt = parseFloat(amount)||0;
 
-  let sColor="#34D399",sBg="#061510",sMsg="✅ Situation stable";
-  if(disponible<=SEUILS.blocage){sColor="#F87171";sBg="#1A0808";sMsg="🔴 Blocage — Survie uniquement";}
-  else if(disponible<=SEUILS.alerte){sColor=T.accentText;sBg=T.isDark?"#141005":T.card2;sMsg="🟡 Alerte — Relancer un client";}
+  let sColor=T.isDark?"#34D399":T.green,sBg=T.isDark?"#061510":"#EEFFD0",sMsg="✅ Situation stable";
+  if(disponible<=SEUILS.blocage){sColor=T.isDark?"#F87171":"#B91C1C";sBg=T.isDark?"#1A0808":"#FBBFBF";sMsg="🔴 Blocage — Survie uniquement";}
+  else if(disponible<=SEUILS.alerte){sColor=T.isDark?"#FBBF24":"#92400E";sBg=T.isDark?"#141005":"#FDE68A";sMsg="🟡 Alerte — Relancer un client";}
 
   // ── Coussin sécurité Trésorerie ──────────────────────────────────────────────
   const COUSSIN_KEY = "coussin";
@@ -1664,7 +1985,7 @@ export default function App() {
 
   // ── Urgence Trésorerie ───────────────────────────────────────────────────────
   const [urgencyModal, setUrgencyModal] = useState(null);
-  // urgencyModal = null | { step: "confirm"|"pin"|"done", amt, label, pinInput, pinError }
+  // urgencyModal = null | { step: "confirm"|"phrase"|"pin"|"done", amt, label, pinInput, pinError, phraseInput }
 
   function submitUrgency(pinCode) {
     if(!urgencyModal) return;
@@ -1704,7 +2025,9 @@ export default function App() {
       });
       setBal(nb); setEnvMax(nm); setTxs([tx,...txs]);
       setAmount(""); setLabel(""); setNote(""); setShowNote(false); setRecur("none");
-      setTxDate(new Date().toISOString().slice(0,10)); setTab("home");
+      setTxDate(new Date().toISOString().slice(0,10));
+      fbFlash(setSubmitFeedback);
+      setTimeout(()=>setTab("home"), 1200);
       return;
     }
 
@@ -1729,7 +2052,9 @@ export default function App() {
     nb[envId]=(nb[envId]||0)-amt;
     setBal(nb); setTxs([tx,...txs]);
     setAmount(""); setLabel(""); setNote(""); setShowNote(false); setRecur("none");
-    setTxDate(new Date().toISOString().slice(0,10)); setTab("home");
+    setTxDate(new Date().toISOString().slice(0,10));
+    fbFlash(setSubmitFeedback);
+    setTimeout(()=>setTab("home"), 1200);
   }
 
   function confirmOverdraft(fallbackEnvId) {
@@ -1832,26 +2157,52 @@ export default function App() {
   function deleteRecurExp(id) { setRE(r=>r.filter(x=>x.id!==id)); }
   function toggleRecurExp(id) { setRE(r=>r.map(x=>x.id===id?{...x,active:!x.active}:x)); }
   function payRecurExp(re) {
-    // Apply as a regular expense transaction
-    const tx={ id:uid(), date:new Date().toISOString(), type:"expense", amount:re.amount, label:re.label, note:"Récurrent", incomeType:"", subcatId:re.subcatId, recur:re.period };
-    const sc=subcats.find(s=>s.id===re.subcatId);
-    const nb={...bal};
-    if(sc?.envelopeId) nb[sc.envelopeId]=Math.max(0,(nb[sc.envelopeId]||0)-re.amount);
-    setBal(nb); setTxs(t=>[tx,...t]);
-    // Advance next date
-    const next=new Date(re.nextDate);
-    if(re.period==="weekly") next.setDate(next.getDate()+7);
-    else if(re.period==="monthly") next.setMonth(next.getMonth()+1);
-    else if(re.period==="yearly") next.setFullYear(next.getFullYear()+1);
-    setRE(r=>r.map(x=>x.id===re.id?{...x,nextDate:next.toISOString().slice(0,10)}:x));
+    const sc = subcats.find(s=>s.id===re.subcatId);
+    const envId = sc?.envelopeId;
+    const currentBal = bal[envId]||0;
+
+    function doAdvanceDate() {
+      const next=new Date(re.nextDate);
+      if(re.period==="weekly") next.setDate(next.getDate()+7);
+      else if(re.period==="monthly") next.setMonth(next.getMonth()+1);
+      else if(re.period==="yearly") next.setFullYear(next.getFullYear()+1);
+      setRE(r=>r.map(x=>x.id===re.id?{...x,nextDate:next.toISOString().slice(0,10)}:x));
+    }
+
+    function doRecord(fromEnvId, shortage) {
+      const tx={ id:uid(), date:new Date().toISOString(), type:"expense", amount:re.amount, label:re.label, note:"Récurrent", incomeType:"", subcatId:re.subcatId, recur:re.period };
+      setBal(b=>{
+        const nb={...b};
+        nb[envId]=(nb[envId]||0)-re.amount;
+        if(fromEnvId && shortage>0) nb[fromEnvId]=(nb[fromEnvId]||0)-shortage;
+        return nb;
+      });
+      setTxs(t=>[tx,...t]);
+      doAdvanceDate();
+    }
+
+    if(currentBal >= re.amount) {
+      // Sufficient funds
+      doRecord(null, 0);
+    } else {
+      // Insufficient — trigger overdraft modal
+      const shortage = re.amount - currentBal;
+      const env = envelopes.find(e=>e.id===envId);
+      setOverdraft({
+        amt: re.amount,
+        envId,
+        envLabel: env?.label||"",
+        currentBal,
+        shortage,
+        onConfirm:(fallbackEnvId, covered)=>{
+          doRecord(fallbackEnvId, covered);
+          setOverdraft(null);
+        }
+      });
+    }
   }
 
   // Days until next payment
-  function daysUntil(dateStr) {
-    const diff = new Date(dateStr) - new Date();
-    return Math.ceil(diff/(1000*60*60*24));
-  }
-
   // History filter
   const filteredTxs = useMemo(()=>{
     const now=new Date();
@@ -1954,7 +2305,7 @@ export default function App() {
           ))}
 
           <button onClick={()=>setTab("add")} style={{marginTop:16,padding:"12px 0",borderRadius:12,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#B4FF00,#5FD34A)",color:"#020303",fontSize:14,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#020303" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.accentBtn} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Ajouter
           </button>
 
@@ -1986,7 +2337,7 @@ export default function App() {
               <div key={p.id}>
                 <div onClick={()=>switchProfile(p.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",background:activeId===p.id?T.card2:T.card,borderRadius:14,marginBottom:4,border:`1.5px solid ${activeId===p.id?T.accent:T.border}`,cursor:"pointer"}}>
                   <div style={{width:40,height:40,borderRadius:12,background:activeId===p.id?T.accent:T.card2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                    <span style={{fontSize:16,fontWeight:800,color:activeId===p.id?T.isDark?"#020303":"#fff":T.accentText}}>{p.name[0].toUpperCase()}</span>
+                    <span style={{fontSize:16,fontWeight:800,color:activeId===p.id?T.accentBtn:T.accentText}}>{p.name[0].toUpperCase()}</span>
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     {editingProfile===p.id?(
@@ -2084,6 +2435,7 @@ export default function App() {
               setLang={setLang}
               setCurrency={setCurrency}
               setSeuils={setSeuils}
+              setCoussin={setCoussin}
               onToggleTheme={toggleTheme}
               onClose={()=>setProfSettings(null)}
             />
@@ -2093,7 +2445,7 @@ export default function App() {
 
       {tab==="home"&&(
         <div style={{flex:1,overflowY:"auto",paddingBottom:90}}>
-          <div style={{background:T.isDark?"linear-gradient(160deg,#060E08,#020303)":"linear-gradient(160deg,#EEF3E8,#F5F7F2)",padding:"52px 20px 24px",borderBottom:`1px solid ${T.border}`}}>
+          <div style={{background:T.isDark?"linear-gradient(160deg,#060E08,#020303)":"#FFFFFF",padding:"52px 20px 24px",borderBottom:`1px solid ${T.border}`}}>
             {/* Profile switcher button */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
               <button onClick={()=>setShowP(true)} style={{display:"flex",alignItems:"center",gap:8,background:T.card2,border:`1px solid ${T.border}`,borderRadius:20,padding:"5px 12px 5px 6px",cursor:"pointer"}}>
@@ -2119,16 +2471,16 @@ export default function App() {
             )}
 
             {/* Chart */}
-            <div style={{background:T.card,borderRadius:16,padding:"16px",marginBottom:20,border:`1px solid ${T.border}`}}>
+            <div style={{background:T.isDark?T.card:"#0A0A0A",borderRadius:16,padding:"16px",marginBottom:20,border:`1px solid ${T.isDark?T.border:"#1A1A1A"}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                <div style={{fontSize:13,fontWeight:700,color:T.text}}>Évolution du solde</div>
+                <div style={{fontSize:13,fontWeight:700,color:T.isDark?T.text:"#FFFFFF"}}>Évolution du solde</div>
                 <div style={{display:"flex",gap:4}}>
                   {[["week","7j"],["month","30j"],["year","1an"]].map(([id,lbl])=>(
-                    <button key={id} onClick={()=>setCP(id)} style={{padding:"4px 8px",borderRadius:8,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:chartPeriod===id?T.accent:T.muted,color:chartPeriod===id?T.isDark?"#020303":"#fff":T.sub}}>{lbl}</button>
+                    <button key={id} onClick={()=>setChartPeriod(id)} style={{padding:"4px 8px",borderRadius:8,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,background:chartPeriod===id?T.chipBg:T.isDark?T.muted:"#1E1E1E",color:chartPeriod===id?T.chipText:T.isDark?T.sub:"#888884"}}>{lbl}</button>
                   ))}
                 </div>
               </div>
-              <LineChart txs={txs} filter={chartPeriod}/>
+              <LineChart txs={txs} filter={chartPeriod} offset={chartOffset} onOffsetChange={setCO}/>
             </div>
 
             {/* Envelopes with progress bars — trésorerie excluded */}
@@ -2142,42 +2494,57 @@ export default function App() {
             </div>
 
             {/* Trésorerie separate */}
-            <div style={{background:T.card,borderRadius:16,padding:"14px 16px",marginBottom:20,border:`1px solid ${T.border}`}}>
+            {(()=>{
+              const TRES_BG = T.isDark ? T.card : "#CCFF00";
+              const TRES_TEXT = T.isDark ? T.accentText : "#030302";
+              const TRES_SUB = T.isDark ? T.sub : "#030302CC";
+              const TRES_INNER = T.isDark ? T.bg : "#B8E80060";
+              const TRES_BORDER = T.isDark ? T.border : "#A8D400";
+              return (
+            <div style={{background:TRES_BG,borderRadius:16,padding:"14px 16px",marginBottom:20,border:`1px solid ${TRES_BORDER}`}}>
               {(()=>{
                 const totalAlloue=sinkFunds.reduce((a,f)=>a+f.current,0);
                 const sfDispo=Math.max(0,(bal.tresorerie||0)-totalAlloue);
+                // Urgence disponible = trésorerie totale MINUS montants alloués aux SF
+                const urgenceDispo = (bal.tresorerie||0) - totalAlloue;
+                const urgenceOk = urgenceDispo >= coussin;
                 return (
                   <>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                       <div>
-                        <div style={{fontSize:14,fontWeight:700,color:T.accentText}}>🟡 Trésorerie</div>
-                        <div style={{fontSize:11,color:T.sub,marginTop:2}}>Réserve intouchable</div>
+                        <div style={{fontSize:14,fontWeight:700,color:TRES_TEXT}}>🟡 Trésorerie</div>
+                        <div style={{fontSize:11,color:TRES_SUB,marginTop:2}}>Réserve intouchable</div>
                       </div>
                       <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                        <div style={{fontSize:20,fontWeight:900,color:T.accentText}}>{fmt(bal.tresorerie||0)}</div>
-                        {(bal.tresorerie||0) >= coussin ? (
+                        <div style={{fontSize:20,fontWeight:900,color:TRES_TEXT}}>{fmt(bal.tresorerie||0)}</div>
+                        {urgenceOk ? (
                           <button onClick={()=>setUrgencyModal({step:"confirm",amt:"",label:"",pinInput:"",pinError:false})}
-                            style={{padding:"4px 10px",borderRadius:8,border:"1px solid #2A1010",background:"#0D0404",color:"#F87171",fontSize:10,fontWeight:700,cursor:"pointer",letterSpacing:.5}}>
+                            style={{padding:"4px 10px",borderRadius:8,border:`1px solid ${T.isDark?"#2A1010":"#030302"}`,background:T.isDark?"#0D0404":"#030302",color:T.isDark?"#F87171":"#CCFF00",fontSize:10,fontWeight:700,cursor:"pointer",letterSpacing:.5}}>
                             🚨 Urgence
                           </button>
                         ) : (
-                          <div title={`Coussin min : ${fmt(coussin)}`}
-                            style={{padding:"4px 10px",borderRadius:8,border:`1px solid ${T.border}`,background:T.bg,color:"#1E3D22",fontSize:10,fontWeight:700,letterSpacing:.5,cursor:"not-allowed"}}>
+                          <div title={totalAlloue>0?`SF alloués : ${fmt(totalAlloue)} — retirer manuellement d'un SF d'abord`:`Coussin min : ${fmt(coussin)}`}
+                            style={{padding:"4px 10px",borderRadius:8,border:`1px solid ${TRES_BORDER}`,background:TRES_INNER,color:TRES_SUB,fontSize:10,fontWeight:700,letterSpacing:.5,cursor:"not-allowed",opacity:.6}}>
                             🚨 Urgence
                           </div>
                         )}
                       </div>
                     </div>
                     {sinkFunds.length>0&&(
-                      <div style={{background:T.bg,borderRadius:10,padding:"10px 12px",marginBottom:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <div style={{background:TRES_INNER,borderRadius:10,padding:"10px 12px",marginBottom:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                         <div>
-                          <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1,marginBottom:2}}>ALLOUÉ SF</div>
+                          <div style={{fontSize:10,color:TRES_SUB,fontWeight:700,letterSpacing:1,marginBottom:2}}>ALLOUÉ SF</div>
                           <div style={{fontSize:14,fontWeight:800,color:"#F87171"}}>{fmt(totalAlloue)}</div>
                         </div>
                         <div>
-                          <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1,marginBottom:2}}>DISPONIBLE SF</div>
-                          <div style={{fontSize:14,fontWeight:800,color:sfDispo>0?T.accentText:T.sub}}>{fmt(sfDispo)}</div>
+                          <div style={{fontSize:10,color:TRES_SUB,fontWeight:700,letterSpacing:1,marginBottom:2}}>DISPONIBLE SF</div>
+                          <div style={{fontSize:14,fontWeight:800,color:sfDispo>0?TRES_TEXT:TRES_SUB}}>{fmt(sfDispo)}</div>
                         </div>
+                      </div>
+                    )}
+                    {!urgenceOk&&totalAlloue>0&&(
+                      <div style={{fontSize:10,color:TRES_SUB,lineHeight:1.4,marginTop:4,padding:"6px 8px",background:TRES_INNER,borderRadius:8}}>
+                        💡 Pour accéder à l'Urgence, retire d'abord des fonds d'un Sinking Fund.
                       </div>
                     )}
                   </>
@@ -2186,15 +2553,17 @@ export default function App() {
               {/* Sinking funds */}
               {sinkFunds.length>0&&(
                 <div style={{marginTop:10}}>
-                  <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>SINKING FUNDS</div>
+                  <div style={{fontSize:10,color:TRES_SUB,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>SINKING FUNDS</div>
                   {sinkFunds.map((f,i)=>{
                     const totalAlloue=sinkFunds.reduce((a,x)=>a+x.current,0);
                     return <SinkingCard key={f.id} fund={f} onDelete={deleteSink} onAdd={addToSink} onUse={useSinkFund} tresorerie={bal.tresorerie||0} totalAlloue={totalAlloue}/>;
                   })}
                 </div>
               )}
-              <button onClick={()=>setTab("sinking")} style={{width:"100%",marginTop:8,padding:"9px 0",borderRadius:10,border:`1px solid ${T.border}`,background:"none",color:T.accentText,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Nouveau Sinking Fund</button>
+              <button onClick={()=>setTab("sinking")} style={{width:"100%",marginTop:8,padding:"9px 0",borderRadius:10,border:`1px solid ${TRES_BORDER}`,background:"none",color:TRES_TEXT,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Nouveau Sinking Fund</button>
             </div>
+              );
+            })()}
 
             {/* Recent */}
             {txs.length>0&&(
@@ -2213,44 +2582,67 @@ export default function App() {
       {/* ══ ADD ══════════════════════════════════════════════════════════════ */}
       {tab==="add"&&(
         <div style={{flex:1,overflowY:"auto",paddingBottom:90}}>
-          <div style={{background:T.card,borderBottom:`1px solid ${T.border}`,padding:"52px 16px 14px"}}>
-            <div style={{display:"flex",background:T.bg,borderRadius:12,padding:3,marginBottom:14}}>
-              {[["expense","💸 Dépense","#F87171"],["income","💰 Revenu","#34D399"]].map(([m,lbl,c])=>(
-                <button key={m} onClick={()=>setAddMode(m)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",background:addMode===m?c+"20":"transparent",color:addMode===m?c:T.sub,fontSize:14,fontWeight:700,boxShadow:addMode===m?`inset 0 0 0 1.5px ${c}60`:"none"}}>{lbl}</button>
+          {/* Header — lime in light mode, dark card in dark mode */}
+          <div style={{background:T.isDark?T.card:"#C4F013",borderBottom:`1px solid ${T.isDark?T.border:"#B0DC00"}`,padding:"52px 16px 14px"}}>
+            {/* Mode switcher */}
+            <div style={{display:"flex",background:T.isDark?T.bg:"#B0DC00",borderRadius:12,padding:3,marginBottom:14}}>
+              {[["expense","💸 Dépense","#F87171"],["income","💰 Revenu",T.isDark?"#34D399":"#030302"]].map(([m,lbl,c])=>(
+                <button key={m} onClick={()=>setAddMode(m)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",
+                  background:addMode===m?(T.isDark?c+"20":"#C4F013"):"transparent",
+                  color:addMode===m?(T.isDark?c:"#030302"):T.isDark?T.sub:"#03030280",
+                  fontSize:14,fontWeight:700,
+                  boxShadow:addMode===m?(T.isDark?`inset 0 0 0 1.5px ${c}60`:"0 1px 4px #00000020"):"none"}}>{lbl}</button>
               ))}
             </div>
+            {/* Amount */}
             <div style={{textAlign:"center",padding:"6px 0 14px"}}>
-              <div style={{fontSize:10,color:T.sub,letterSpacing:2,fontWeight:700,marginBottom:4}}>MONTANT</div>
-              <div style={{fontSize:48,fontWeight:900,color:amount?T.text:T.border,letterSpacing:-2,lineHeight:1}}>
-                {amount||"0"} <span style={{fontSize:20,color:T.sub,fontWeight:600}}>{currency}</span>
+              <div style={{fontSize:10,color:T.isDark?T.sub:"#03030280",letterSpacing:2,fontWeight:700,marginBottom:4}}>MONTANT</div>
+              <div style={{fontSize:48,fontWeight:900,color:amount?(T.isDark?T.text:"#030302"):(T.isDark?T.border:"#03030240"),letterSpacing:-2,lineHeight:1}}>
+                {amount||"0"} <span style={{fontSize:20,color:T.isDark?T.sub:"#03030280",fontWeight:600}}>{currency}</span>
               </div>
             </div>
+            {/* Numpad */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:2,marginBottom:12}}>
               {["1","2","3","4","5","6","7","8","9",".",0,"⌫"].map((k,i)=>(
-                <button key={i} onClick={()=>pressKey(String(k))} style={{padding:"15px 0",fontSize:k==="⌫"?20:22,fontWeight:600,background:k==="⌫"?T.card:T.card2,border:`1px solid ${T.border}`,borderRadius:10,cursor:"pointer",color:k==="⌫"?"#F87171":T.text}}>{k}</button>
+                <button key={i} onClick={()=>pressKey(String(k))} style={{padding:"15px 0",fontSize:k==="⌫"?20:22,fontWeight:600,
+                  background:k==="⌫"?(T.isDark?T.card:"#C4F013"):(T.isDark?T.card2:"#D4FF1A"),
+                  border:`1px solid ${T.isDark?T.border:"#B0DC0060"}`,borderRadius:10,cursor:"pointer",
+                  color:k==="⌫"?"#F87171":(T.isDark?T.text:"#030302")}}>{k}</button>
               ))}
             </div>
-            {/* ── Témoin seuil — uniquement en mode dépense ── */}
+            {/* Alert banner */}
             {addMode==="expense"&&disponible<=seuils.alerte&&(
               <div style={{
                 padding:"10px 14px",borderRadius:12,marginBottom:10,
-                background:disponible<=seuils.blocage?T.isDark?"#1A0808":"#FEF2F2":T.isDark?"#141005":T.card2,
-                border:`1px solid ${disponible<=seuils.blocage?"#F87171":"#B4FF00"}`,
+                background:disponible<=seuils.blocage
+                  ?(T.isDark?"#1A0808":"#FBBFBF")
+                  :(T.isDark?"#141005":"#FDE68A"),
+                border:`1px solid ${disponible<=seuils.blocage
+                  ?(T.isDark?"#F87171":"#B91C1C")
+                  :(T.isDark?"#FBBF24":"#D97706")}`,
                 display:"flex",alignItems:"center",gap:10,
               }}>
                 <span style={{fontSize:16,flexShrink:0}}>{disponible<=seuils.blocage?"🔴":"🟡"}</span>
                 <div>
-                  <div style={{fontSize:12,fontWeight:700,color:disponible<=seuils.blocage?"#F87171":T.accentText}}>
+                  <div style={{fontSize:12,fontWeight:700,color:disponible<=seuils.blocage
+                    ?(T.isDark?"#F87171":"#B91C1C")
+                    :(T.isDark?"#FBBF24":"#92400E")}}>
                     {disponible<=seuils.blocage?"Zone de blocage":"Zone d'alerte"}
                   </div>
-                  <div style={{fontSize:11,color:"#3A6040"}}>
+                  <div style={{fontSize:11,color:T.sub}}>
                     Solde disponible : {fmt(disponible)} — Seuil : {fmt(disponible<=seuils.blocage?seuils.blocage:seuils.alerte)}
                   </div>
                 </div>
               </div>
             )}
-            <button onClick={submit} disabled={!amt} style={{width:"100%",padding:"14px 0",borderRadius:14,border:"none",cursor:amt?"pointer":"not-allowed",background:!amt?T.muted:addMode==="income"?"linear-gradient(135deg,#5FD34A,#B4FF00)":"linear-gradient(90deg,#DC2626,#F87171)",color:amt?"#fff":T.sub,fontSize:16,fontWeight:800}}>
-              {addMode==="income"?"Enregistrer le revenu":"Enregistrer la dépense"}
+            {/* Submit */}
+            <button onClick={submit} disabled={!amt||submitFeedback} style={{width:"100%",padding:"14px 0",borderRadius:14,border:"none",cursor:amt?"pointer":"not-allowed",
+              background:submitFeedback?"#34D399":!amt?(T.isDark?T.muted:"#B0DC0080"):addMode==="income"?(T.isDark?"linear-gradient(135deg,#5FD34A,#B4FF00)":"#030302"):"linear-gradient(90deg,#DC2626,#F87171)",
+              color:submitFeedback?"#020303":amt?(T.isDark?T.accentBtn:addMode==="income"?"#C4F013":"#fff"):(T.isDark?T.sub:"#03030240"),
+              fontSize:16,fontWeight:800,transition:"all .2s"}}>
+              {submitFeedback
+                ?(addMode==="income"?"✅ Revenu enregistré !":"✅ Dépense enregistrée !")
+                :(addMode==="income"?"Enregistrer le revenu":"Enregistrer la dépense")}
             </button>
           </div>
           <div style={{padding:"16px 16px 0"}}>
@@ -2269,7 +2661,7 @@ export default function App() {
                 <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>RENOUVELLEMENT</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
                   {RECUR_OPTIONS.map(ro=>(
-                    <button key={ro.id} onClick={()=>setRecur(ro.id)} style={{padding:"6px 12px",borderRadius:20,border:`1px solid ${recur===ro.id?"#B4FF00":T.border}`,background:recur===ro.id?T.accent+"18":T.card,color:recur===ro.id?"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>{ro.label}</button>
+                    <button key={ro.id} onClick={()=>setRecur(ro.id)} style={{padding:"6px 12px",borderRadius:20,border:`1px solid ${recur===ro.id?T.chipBg:T.border}`,background:recur===ro.id?T.chipBg:T.card,color:recur===ro.id?T.chipText:T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>{ro.label}</button>
                   ))}
                 </div>
                 <div style={{marginBottom:14}}><SplitPreview/></div>
@@ -2279,7 +2671,7 @@ export default function App() {
                 <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>CATÉGORIE</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
                   {subcats.map(sc=>{ const env=envelopes.find(e=>e.id===sc.envelopeId); const active=subcatId===sc.id; return (
-                    <button key={sc.id} onClick={()=>setScId(sc.id)} style={{padding:"7px 13px",borderRadius:20,border:`1.5px solid ${active?env?.color||T.border:T.border}`,background:active?(env?.bg||T.card2):T.card,color:active?(env?.color||T.text):T.sub,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+                    <button key={sc.id} onClick={()=>setScId(sc.id)} style={{padding:"7px 13px",borderRadius:20,border:`1.5px solid ${active?env?.color||T.border:T.border}`,background:active?(env?.color||T.accent)+"22":T.card,color:active?(env?.color||T.accent):T.sub,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
                       <span style={{width:7,height:7,borderRadius:"50%",background:env?.color||T.sub,display:"inline-block",flexShrink:0}}/>{sc.label}
                     </button>
                   );})}
@@ -2305,7 +2697,7 @@ export default function App() {
             <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>PÉRIODE</div>
             <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
               {[["all","Tout"],["day","Jour"],["week","Semaine"],["month","Mois"],["year","Année"]].map(([id,lbl])=>(
-                <button key={id} onClick={()=>{ setHPeriod(id); setHDF(""); setHDT(""); }} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hPeriod===id&&!hDateFrom&&!hDateTo?"#B4FF00":T.border}`,background:hPeriod===id&&!hDateFrom&&!hDateTo?"#B4FF0022":T.card2,color:hPeriod===id&&!hDateFrom&&!hDateTo?"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>{lbl}</button>
+                <button key={id} onClick={()=>{ setHPeriod(id); setHDF(""); setHDT(""); }} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hPeriod===id&&!hDateFrom&&!hDateTo?T.chipBg:T.border}`,background:hPeriod===id&&!hDateFrom&&!hDateTo?T.chipBg:T.card2,color:hPeriod===id&&!hDateFrom&&!hDateTo?T.chipText:T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>{lbl}</button>
               ))}
             </div>
 
@@ -2329,14 +2721,14 @@ export default function App() {
             <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>TYPE</div>
             <div style={{display:"flex",gap:5,marginBottom:10}}>
               {[["all","Tous"],["income","Revenus"],["expense","Dépenses"]].map(([id,lbl])=>(
-                <button key={id} onClick={()=>setHType(id)} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hType===id?"#B4FF00":T.border}`,background:hType===id?"#B4FF0022":T.card2,color:hType===id?"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>{lbl}</button>
+                <button key={id} onClick={()=>setHType(id)} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hType===id?T.chipBg:T.border}`,background:hType===id?T.chipBg:T.card2,color:hType===id?T.chipText:T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>{lbl}</button>
               ))}
             </div>
 
             {/* ENVELOPPE */}
             <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>ENVELOPPE</div>
             <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
-              <button onClick={()=>{ setHEnv("all"); setHSC("all"); }} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hEnv==="all"?"#B4FF00":T.border}`,background:hEnv==="all"?"#B4FF0022":T.card2,color:hEnv==="all"?"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>Toutes</button>
+              <button onClick={()=>{ setHEnv("all"); setHSC("all"); }} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hEnv==="all"?T.chipBg:T.border}`,background:hEnv==="all"?T.chipBg:T.card2,color:hEnv==="all"?T.chipText:T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>Toutes</button>
               {envelopes.map(env=>(
                 <button key={env.id} onClick={()=>{ setHEnv(env.id); setHSC("all"); }} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hEnv===env.id?env.color:T.border}`,background:hEnv===env.id?env.color+"22":T.card,color:hEnv===env.id?env.color:T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                   <span style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:env.color,marginRight:5,verticalAlign:"middle"}}/>{env.label}
@@ -2349,7 +2741,7 @@ export default function App() {
               <>
                 <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>SOUS-CATÉGORIE</div>
                 <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:16}}>
-                  <button onClick={()=>setHSC("all")} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hSubcat==="all"?"#B4FF00":T.border}`,background:hSubcat==="all"?"#B4FF0022":T.card2,color:hSubcat==="all"?"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>Toutes</button>
+                  <button onClick={()=>setHSC("all")} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hSubcat==="all"?T.chipBg:T.border}`,background:hSubcat==="all"?T.chipBg:T.card2,color:hSubcat==="all"?T.chipText:T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}}>Toutes</button>
                   {filteredSubcats.map(sc=>{ const env=envelopes.find(e=>e.id===sc.envelopeId); return (
                     <button key={sc.id} onClick={()=>setHSC(sc.id)} style={{padding:"5px 11px",borderRadius:20,border:`1px solid ${hSubcat===sc.id?env?.color||"#B4FF00":T.border}`,background:hSubcat===sc.id?(env?.color||T.accent)+"22":T.card,color:hSubcat===sc.id?env?.color||"#B4FF00":T.sub,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{width:5,height:5,borderRadius:"50%",background:env?.color||T.sub,display:"inline-block"}}/>{sc.label}
@@ -2417,7 +2809,7 @@ export default function App() {
           <div style={{padding:"52px 16px 0"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
               <div style={{fontSize:28,fontWeight:800,color:T.text}}>Catégories</div>
-              <button onClick={()=>setShowReset(true)} style={{padding:"6px 12px",borderRadius:10,border:`1px solid #F8717160`,background:"#1A080820",color:"#F87171",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+              <button onClick={()=>setShowReset(true)} style={{padding:"6px 12px",borderRadius:10,border:`1px solid #F8717160`,background:T.isDark?"#1A080820":"#FEE2E220",color:"#F87171",fontSize:12,fontWeight:700,cursor:"pointer"}}>
                 Réinitialiser
               </button>
             </div>
@@ -2439,7 +2831,7 @@ export default function App() {
             )}
             <div style={{display:"flex",background:T.bg,borderRadius:12,padding:3,marginBottom:20}}>
               {[["envelopes","Enveloppes"],["splits","Répartition %"]].map(([id,lbl])=>(
-                <button key={id} onClick={()=>setCatTab(id)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",background:catTab===id?T.accent:"transparent",color:catTab===id?T.isDark?"#020303":"#fff":T.sub,fontSize:13,fontWeight:700}}>{lbl}</button>
+                <button key={id} onClick={()=>setCatTab(id)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",background:catTab===id?T.accent:"transparent",color:catTab===id?T.accentBtn:T.sub,fontSize:13,fontWeight:700}}>{lbl}</button>
               ))}
             </div>
 
@@ -2448,66 +2840,8 @@ export default function App() {
                 <div style={{fontSize:11,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:10}}>ENVELOPPES</div>
                 <div style={{background:T.card,borderRadius:16,overflow:"hidden",border:`1px solid ${T.border}`,marginBottom:16}}>
                   {envelopes.map((env,i)=>(
-                    <div key={env.id}>
-                      <div style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderBottom:(i<envelopes.length-1&&editingColor!==env.id)?`1px solid ${T.border}`:undefined}}>
-                        {/* Color dot — tap to edit color */}
-                        <div
-                          onClick={()=>setEC(editingColor===env.id?null:env.id)}
-                          style={{width:22,height:22,borderRadius:"50%",background:env.color,flexShrink:0,cursor:"pointer",border:editingColor===env.id?`2px solid ${T.text}`:"2px solid transparent",transition:"border .15s"}}
-                        />
-                        {editingEnv===env.id&&!env.system?(
-                          <input value={editingLabel} onChange={e=>setEL(e.target.value)}
-                            onBlur={()=>{ safeSetEnv(envelopes.map(x=>x.id===env.id?{...x,label:editingLabel}:x)); setEEv(null); }}
-                            autoFocus style={{...inp,flex:1,padding:"4px 8px",fontSize:14}}/>
-                        ):(
-                          <div style={{flex:1}} onClick={()=>{ if(!env.system){ setEEv(env.id); setEL(env.label); } }}>
-                            <div style={{fontSize:14,fontWeight:600,color:T.text,display:"flex",alignItems:"center",gap:6}}>
-                              {env.label}
-                              {env.system&&<span style={{fontSize:9,color:T.sub,background:T.muted,padding:"2px 6px",borderRadius:6,fontWeight:700,letterSpacing:0.5}}>SYSTÈME</span>}
-                            </div>
-                            {!env.system&&<div style={{fontSize:10,color:T.sub,marginTop:1}}>Tap sur le point pour changer la couleur</div>}
-                            {env.system&&<div style={{fontSize:10,color:T.sub,marginTop:1}}>Non modifiable — rôle réservé</div>}
-                          </div>
-                        )}
-                        {env.system
-                          ? <span style={{fontSize:11,color:T.sub,padding:"0 4px",fontWeight:600}}>🔒</span>
-                          : <button onClick={()=>{
-                              if(envelopes.length<=1) return;
-                              const delId = env.id;
-                              safeSetEnv(envelopes.filter(x=>x.id!==delId));
-                              setSub(subcats.filter(s=>s.envelopeId!==delId));
-                              // Purge this envelope's percentage from ALL income rules' splits
-                              setIR(rules => Object.fromEntries(Object.entries(rules).map(([k,r]) => {
-                                const { [delId]:_, ...rest } = r.split;
-                                return [k, { ...r, split: rest }];
-                              })));
-                              // Clean up balances and max tracking for the deleted envelope
-                              setBal(b => { const { [delId]:_, ...rest } = b; return rest; });
-                              setEnvMax(m => { const { [delId]:_, ...rest } = m; return rest; });
-                            }} style={{background:"none",border:"none",cursor:"pointer",color:"#F87171",fontSize:18,padding:"0 4px"}}>×</button>
-                        }
-                      </div>
-                      {/* Color picker inline */}
-                      {editingColor===env.id&&(
-                        <div style={{padding:"10px 16px 14px",background:T.bg,borderBottom:`1px solid ${T.border}`}}>
-                          <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:8}}>CHOISIR UNE COULEUR</div>
-                          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-                            {["#F87171","#FBBF24","#34D399","#B4FF00","#60A5FA","#A78BFA","#F472B6","#FB923C","#94A3B8","#E2E8F0","#818CF8","#2DD4BF"].map(c=>(
-                              <button key={c} onClick={()=>{
-                                safeSetEnv(prev=>prev.map(x=>x.id===env.id?{...x,color:c,bg:c+"22"}:x));
-                              }} style={{width:28,height:28,borderRadius:"50%",background:c,border:env.color===c?`3px solid ${T.text}`:"3px solid transparent",cursor:"pointer",flexShrink:0}}/>
-                            ))}
-                            {/* Custom color */}
-                            <div style={{position:"relative",width:28,height:28}}>
-                              <input type="color" value={env.color}
-                                onChange={e=>{ const val=e.target.value; safeSetEnv(prev=>prev.map(x=>x.id===env.id?{...x,color:val,bg:val+"22"}:x)); }}
-                                style={{width:"100%",height:"100%",borderRadius:"50%",border:"none",cursor:"pointer",padding:0,background:"none"}}/>
-                            </div>
-                          </div>
-                          <button onClick={()=>setEC(null)} style={{fontSize:12,color:T.accentText,background:"none",border:"none",cursor:"pointer",fontWeight:700}}>✓ Fermer</button>
-                        </div>
-                      )}
-                    </div>
+                    <EnvRow key={env.id} env={env} isLast={i===envelopes.length-1} editingColor={editingColor} editingEnv={editingEnv} editingLabel={editingLabel}
+                      setEC={setEC} setEEv={setEEv} setEL={setEL} inp={inp} safeSetEnv={safeSetEnv} envelopes={envelopes} subcats={subcats} setSub={setSub} setIR={setIR} setBal={setBal} setEnvMax={setEnvMax} T={T}/>
                   ))}
                 </div>
                 <div style={{background:T.card,borderRadius:16,padding:"14px 16px",border:`1px solid ${T.border}`,marginBottom:24}}>
@@ -2518,7 +2852,9 @@ export default function App() {
                     <input type="color" value={newEnvColor} onChange={e=>setNEC(e.target.value)} style={{width:36,height:36,borderRadius:8,border:"none",background:"none",cursor:"pointer"}}/>
                     <span style={{width:20,height:20,borderRadius:"50%",background:newEnvColor,display:"inline-block"}}/>
                   </div>
-                  <button onClick={()=>{ if(!newEnvLabel.trim()) return; const id=uid(); safeSetEnv([...envelopes,{id,label:newEnvLabel.trim(),color:newEnvColor,bg:newEnvColor+"22"}]); setBal(b=>({...b,[id]:0})); setNEL(""); setNEC("#B4FF00"); }} style={{width:"100%",padding:"10px 0",borderRadius:12,border:"none",background:"#B4FF00",color:"#050607",fontSize:14,fontWeight:700,cursor:"pointer"}}>+ Ajouter</button>
+                  <button onClick={()=>{ if(!newEnvLabel.trim()) return; const id=uid(); safeSetEnv([...envelopes,{id,label:newEnvLabel.trim(),color:newEnvColor,bg:newEnvColor+"22"}]); setBal(b=>({...b,[id]:0})); setNEL(""); setNEC("#B4FF00"); fbFlash(setAEF); }} style={{width:"100%",padding:"10px 0",borderRadius:12,border:"none",background:addEnvFeedback?"#34D399":T.accent,color:addEnvFeedback?"#020303":T.accentBtn,fontSize:14,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+                    {addEnvFeedback?"✅ Ajouté !":"+ Ajouter"}
+                  </button>
                 </div>
                 {envelopes.map(env=>{
                   const scs=subcats.filter(s=>s.envelopeId===env.id);
@@ -2531,24 +2867,16 @@ export default function App() {
                       <div style={{background:T.card,borderRadius:16,overflow:"hidden",border:`1px solid ${T.border}`,marginBottom:10}}>
                         {scs.length===0&&<div style={{padding:"12px 16px",fontSize:13,color:T.sub}}>Aucune sous-catégorie</div>}
                         {scs.map((sc,i)=>(
-                          <div key={sc.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:i<scs.length-1?`1px solid ${T.border}`:undefined}}>
-                            <span style={{width:8,height:8,borderRadius:"50%",background:env.color,flexShrink:0}}/>
-                            {editingSubcat===sc.id?(
-                              <input value={editingSubLabel} onChange={e=>setESL(e.target.value)}
-                                onBlur={()=>{ if(editingSubLabel.trim()) setSub(subcats.map(x=>x.id===sc.id?{...x,label:editingSubLabel.trim()}:x)); setESC(null); }}
-                                onKeyDown={e=>{ if(e.key==="Enter") e.target.blur(); }}
-                                autoFocus
-                                style={{flex:1,padding:"3px 6px",borderRadius:6,border:`1px solid ${env.color}60`,background:T.bg,color:T.text,fontSize:14,outline:"none"}}/>
-                            ):(
-                              <div onClick={()=>{ setESC(sc.id); setESL(sc.label); }} style={{flex:1,fontSize:14,color:T.text,cursor:"pointer"}}>{sc.label}</div>
-                            )}
-                            <button onClick={()=>setSub(subcats.filter(x=>x.id!==sc.id))} style={{background:"none",border:"none",cursor:"pointer",color:"#F87171",fontSize:18,padding:"0 4px"}}>×</button>
-                          </div>
+                          <SubcatRow key={sc.id} sc={sc} env={env} subcats={subcats} setSub={setSub}
+                            editingSubcat={editingSubcat} setESC={setESC} editingSubLabel={editingSubLabel} setESL={setESL}
+                            isLast={i===scs.length-1}/>
                         ))}
                       </div>
                       <div style={{display:"flex",gap:8}}>
                         <input value={newScEnv===env.id?newScLabel:""} onChange={e=>{setNSL(e.target.value);setNSE(env.id);}} placeholder={`+ Sous-catégorie ${env.label}`} style={{...inp,flex:1,fontSize:13}} onFocus={()=>setNSE(env.id)}/>
-                        <button onClick={()=>{ if(!newScLabel.trim()||newScEnv!==env.id) return; setSub([...subcats,{id:uid(),label:newScLabel.trim(),envelopeId:env.id}]); setNSL(""); setNSE(""); }} style={{padding:"10px 14px",borderRadius:12,border:"none",background:env.color,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0}}>+</button>
+                        <button onClick={()=>{ if(!newScLabel.trim()||newScEnv!==env.id) return; setSub([...subcats,{id:uid(),label:newScLabel.trim(),envelopeId:env.id}]); setNSL(""); setNSE(""); fbFlash(setASCF); }} style={{padding:"10px 14px",borderRadius:12,border:"none",background:addScFeedback?"#34D399":env.color,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,transition:"all .2s"}}>
+                          {addScFeedback?"✅":"+"}
+                        </button>
                       </div>
                     </div>
                   );
@@ -2561,26 +2889,9 @@ export default function App() {
                 <div style={{fontSize:11,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>TYPES DE REVENUS</div>
                 <div style={{fontSize:12,color:T.sub,marginBottom:12}}>Modifie, ajoute ou supprime un type. Total répartition = 100%.</div>
                 {Object.entries(incomeRules).map(([k,r])=>(
-                  <div key={k} style={{marginBottom:16}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
-                        <span style={{fontSize:18}}>{r.icon}</span>
-                        {editingIR===k?(
-                          <input value={editingIRLabel} onChange={e=>setEIRL(e.target.value)}
-                            onBlur={()=>{ if(editingIRLabel.trim()) setIR(rules=>({...rules,[k]:{...rules[k],label:editingIRLabel.trim()}})); setEIR(null); }}
-                            onKeyDown={e=>{ if(e.key==="Enter") e.target.blur(); }}
-                            autoFocus
-                            style={{flex:1,padding:"3px 6px",borderRadius:6,border:`1px solid ${r.color}60`,background:T.bg,color:T.text,fontSize:14,fontWeight:700,outline:"none"}}/>
-                        ):(
-                          <span onClick={()=>{ setEIR(k); setEIRL(r.label); }} style={{fontSize:14,fontWeight:700,color:T.text,cursor:"pointer"}}>{r.label}</span>
-                        )}
-                      </div>
-                      {Object.keys(incomeRules).length>1&&(
-                        <button onClick={()=>setIR(rules=>{ const n={...rules}; delete n[k]; return n; })} style={{background:"none",border:"none",color:"#F87171",fontSize:18,cursor:"pointer",padding:"0 4px"}}>×</button>
-                      )}
-                    </div>
-                    <SplitEditor key={k} ruleKey={k} rule={r} envelopes={envelopes} setIncomeRules={setIR}/>
-                  </div>
+                  <IRRow key={k} k={k} r={r} incomeRules={incomeRules} setIR={setIR}
+                    editingIR={editingIR} setEIR={setEIR} editingIRLabel={editingIRLabel} setEIRL={setEIRL}
+                    envelopes={envelopes}/>
                 ))}
 
                 {/* ── Add new income type ── */}
@@ -2611,7 +2922,7 @@ export default function App() {
                       </div>
                     ))}
                     {(()=>{ const tot=Object.values(newIRSplit).reduce((a,v)=>a+(parseFloat(v)||0),0); return (
-                      <div style={{fontSize:11,color:Math.round(tot)===100?T.accentText:"#F87171",marginTop:4,fontWeight:700}}>{Math.round(tot)}% / 100%</div>
+                      <div style={{fontSize:11,color:Math.round(tot)===100?T.isDark?"#34D399":T.green:"#F87171",marginTop:4,fontWeight:700}}>{Math.round(tot)}% / 100%</div>
                     ); })()}
                   </div>
                   <button onClick={()=>{
@@ -2622,8 +2933,9 @@ export default function App() {
                     const split=Object.fromEntries(Object.entries(newIRSplit).map(([k,v])=>[k,parseFloat(v)||0]));
                     setIR(r=>({...r,[k]:{label:newIRLabel.trim(),icon:newIRIcon,color:"#B4FF00",split}}));
                     setNIRL(""); setNIRI("💰"); setNIRS(Object.fromEntries(envelopes.map(e=>[e.id,0])));
-                  }} style={{width:"100%",padding:"10px 0",borderRadius:12,border:"none",background:"#B4FF00",color:"#020303",fontSize:14,fontWeight:800,cursor:"pointer"}}>
-                    + Ajouter ce type
+                    fbFlash(setAIRF);
+                  }} style={{width:"100%",padding:"10px 0",borderRadius:12,border:"none",background:addIRFeedback?"#34D399":T.accent,color:addIRFeedback?"#020303":T.accentBtn,fontSize:14,fontWeight:800,cursor:"pointer",transition:"all .2s"}}>
+                    {addIRFeedback?"✅ Ajouté !":"+ Ajouter ce type"}
                   </button>
                 </div>
               </>
@@ -2668,45 +2980,10 @@ export default function App() {
             )}
             {recurExp.length>0&&(
               <div style={{marginBottom:20}}>
-                {recurExp.map(re=>{
-                  const sc=subcats.find(s=>s.id===re.subcatId);
-                  const env=envelopes.find(e=>e.id===sc?.envelopeId);
-                  const days=daysUntil(re.nextDate);
-                  const urgent=days<=3&&days>=0;
-                  const overdue=days<0;
-                  return (
-                    <div key={re.id} style={{background:T.card,borderRadius:14,padding:"14px 16px",border:`1.5px solid ${overdue?"#F87171":urgent?"#FBBF24":T.border}`,marginBottom:10,opacity:re.active?1:0.5}}>
-                      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:8}}>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:15,fontWeight:700,color:T.text}}>{re.label}</div>
-                          <div style={{fontSize:11,color:T.sub,marginTop:2,display:"flex",gap:8,alignItems:"center"}}>
-                            {env&&<span style={{color:envTextColor(env.color)}>● {env.label}</span>}
-                            <span>{sc?.label}</span>
-                            <span>· {RECUR_OPTIONS.find(r=>r.id===re.period)?.label}</span>
-                          </div>
-                        </div>
-                        <div style={{fontSize:17,fontWeight:800,color:"#F87171",marginLeft:8}}>{fmt(re.amount)}</div>
-                      </div>
-                      {/* Next date */}
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                        <div style={{fontSize:12,color:overdue?"#F87171":urgent?"#FBBF24":T.sub}}>
-                          {overdue?`En retard de ${Math.abs(days)}j`:days===0?"Aujourd'hui !":urgent?`Dans ${days}j`:`Prochain : ${new Date(re.nextDate).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}`}
-                        </div>
-                        {(overdue||urgent)&&<div style={{width:8,height:8,borderRadius:"50%",background:overdue?"#F87171":"#FBBF24",animation:"pulse 1s infinite"}}/>}
-                      </div>
-                      {/* Actions */}
-                      <div style={{display:"flex",gap:6}}>
-                        <button onClick={()=>payRecurExp(re)} disabled={!re.active} style={{flex:1,padding:"8px 0",borderRadius:10,border:"none",background:re.active?"#B4FF00":T.muted,color:re.active?"#020303":T.sub,fontSize:12,fontWeight:700,cursor:re.active?"pointer":"default"}}>
-                          ✓ Payer maintenant
-                        </button>
-                        <button onClick={()=>toggleRecurExp(re.id)} style={{padding:"8px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:"none",color:re.active?"#FBBF24":T.sub,fontSize:11,fontWeight:600,cursor:"pointer"}}>
-                          {re.active?"Pause":"Activer"}
-                        </button>
-                        <button onClick={()=>deleteRecurExp(re.id)} style={{padding:"8px 10px",borderRadius:10,border:"none",background:"#1A0808",color:"#F87171",fontSize:13,cursor:"pointer"}}>×</button>
-                      </div>
-                    </div>
-                  );
-                })}
+                {recurExp.map(re=>(
+                  <RecurRow key={re.id} re={re} subcats={subcats} envelopes={envelopes}
+                    onPay={payRecurExp} onToggle={toggleRecurExp} onDelete={deleteRecurExp}/>
+                ))}
               </div>
             )}
 
@@ -2718,7 +2995,7 @@ export default function App() {
               <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>FRÉQUENCE</div>
               <div style={{display:"flex",gap:6,marginBottom:10}}>
                 {RECUR_OPTIONS.filter(r=>r.id!=="none").map(ro=>(
-                  <button key={ro.id} onClick={()=>setREP(ro.id)} style={{flex:1,padding:"7px 4px",borderRadius:10,border:`1px solid ${rePeriod===ro.id?"#B4FF00":T.border}`,background:rePeriod===ro.id?T.accent+"18":T.bg,color:rePeriod===ro.id?"#B4FF00":T.sub,fontSize:11,fontWeight:600,cursor:"pointer"}}>{ro.label.replace("Chaque ","")}</button>
+                  <button key={ro.id} onClick={()=>setREP(ro.id)} style={{flex:1,padding:"7px 4px",borderRadius:10,border:`1px solid ${rePeriod===ro.id?T.chipBg:T.border}`,background:rePeriod===ro.id?T.chipBg:T.bg,color:rePeriod===ro.id?T.chipText:T.sub,fontSize:11,fontWeight:600,cursor:"pointer"}}>{ro.label.replace("Chaque ","")}</button>
                 ))}
               </div>
               <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>CATÉGORIE</div>
@@ -2727,7 +3004,7 @@ export default function App() {
                   const env=envelopes.find(e=>e.id===sc.envelopeId);
                   const active=reScId===sc.id;
                   return (
-                    <button key={sc.id} onClick={()=>setRESC(sc.id)} style={{padding:"5px 10px",borderRadius:20,border:`1.5px solid ${active?env?.color||"#B4FF00":T.border}`,background:active?(env?.bg||T.card2):T.bg,color:active?(env?.color||T.text):T.sub,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                    <button key={sc.id} onClick={()=>setRESC(sc.id)} style={{padding:"5px 10px",borderRadius:20,border:`1.5px solid ${active?env?.color||"#B4FF00":T.border}`,background:active?(env?.color||T.accent)+"22":T.bg,color:active?(env?.color||T.accent):T.sub,fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{width:5,height:5,borderRadius:"50%",background:env?.color||T.sub,display:"inline-block"}}/>{sc.label}
                     </button>
                   );
@@ -2735,8 +3012,8 @@ export default function App() {
               </div>
               <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>PREMIÈRE ÉCHÉANCE</div>
               <input type="date" value={reNextDate} onChange={e=>setREND(e.target.value)} style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:12,colorScheme:"dark"}}/>
-              <button onClick={addRecurExp} style={{width:"100%",padding:"12px 0",borderRadius:12,border:"none",background:reLabel&&reAmt&&reScId?"#B4FF00":T.muted,color:reLabel&&reAmt&&reScId?"#020303":T.sub,fontSize:14,fontWeight:800,cursor:reLabel&&reAmt&&reScId?"pointer":"not-allowed"}}>
-                + Ajouter
+              <button onClick={()=>{ addRecurExp(); if(reLabel&&reAmt&&reScId){ fbFlash(setARF); } }} style={{width:"100%",padding:"12px 0",borderRadius:12,border:"none",background:addRecurFeedback?"#34D399":reLabel&&reAmt&&reScId?T.accent:T.muted,color:addRecurFeedback?"#020303":reLabel&&reAmt&&reScId?T.accentBtn:T.sub,fontSize:14,fontWeight:800,cursor:reLabel&&reAmt&&reScId?"pointer":"not-allowed",transition:"all .2s"}}>
+                {addRecurFeedback?"✅ Ajouté !":"+ Ajouter"}
               </button>
             </div>
           </div>
@@ -2748,8 +3025,8 @@ export default function App() {
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:T.isDark?"rgba(2,3,3,0.98)":"rgba(245,247,242,0.98)",backdropFilter:"blur(24px)",borderTop:`1px solid ${T.border}`,display:"flex",paddingBottom:18,paddingTop:10,zIndex:100}}>
         {NAV_ITEMS.map(t=>t.big?(
           <div key="add" style={{flex:1,display:"flex",justifyContent:"center"}}>
-            <button onClick={()=>setTab("add")} style={{width:50,height:50,borderRadius:16,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#B4FF00,#5FD34A)",boxShadow:"0 4px 20px #B4FF0060",display:"flex",alignItems:"center",justifyContent:"center",marginTop:-10}}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#020303" strokeWidth="2.5" strokeLinecap="round">
+            <button onClick={()=>setTab("add")} style={{width:50,height:50,borderRadius:16,border:"none",cursor:"pointer",background:T.isDark?"linear-gradient(135deg,#B4FF00,#5FD34A)":"linear-gradient(135deg,#C4F013,#B8E800)",boxShadow:T.isDark?"0 4px 20px #B4FF0060":"0 4px 16px #C4F01350",display:"flex",alignItems:"center",justifyContent:"center",marginTop:-10}}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.accentBtn} strokeWidth="2.5" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
             </button>
@@ -2805,7 +3082,7 @@ export default function App() {
                     </button>
                     <button onClick={()=>{
                       if(!urgencyModal.label.trim()||!parseFloat(urgencyModal.amt)) return;
-                      setUrgencyModal(u=>({...u,step:"pin",pinInput:"",pinError:false}));
+                      setUrgencyModal(u=>({...u,step:"phrase",phraseInput:"",pinInput:"",pinError:false}));
                     }}
                       disabled={!urgencyModal.label.trim()||!parseFloat(urgencyModal.amt)}
                       style={{flex:2,padding:"13px 0",borderRadius:12,border:"none",background:urgencyModal.label.trim()&&parseFloat(urgencyModal.amt)?"#F87171":T.muted,color:urgencyModal.label.trim()&&parseFloat(urgencyModal.amt)?"#020303":T.sub,fontSize:14,fontWeight:800,cursor:"pointer"}}>
@@ -2815,7 +3092,53 @@ export default function App() {
                 </>
               )}
 
-              {/* Étape 2 — PIN */}
+              {/* Étape 2 — Recopier la phrase */}
+              {urgencyModal.step==="phrase"&&(()=>{
+                const montantFmt = fmt(parseFloat(urgencyModal.amt)||0);
+                const desc = urgencyModal.label.trim();
+                const expectedPhrase = `J'ai vraiment besoin de ${montantFmt} pour ${desc}`;
+                const phraseInput = urgencyModal.phraseInput||"";
+                const normalize = s => s.toLowerCase().replace(/[\s'''`""„"']/g,"").replace(/[^\w]/g,"");
+                const phraseOk = normalize(phraseInput) === normalize(expectedPhrase);
+                return (
+                  <>
+                    <div style={{background:T.isDark?"#100808":"#FEF2F2",borderRadius:12,padding:"14px",border:"1px solid #2A1010",marginBottom:16}}>
+                      <div style={{fontSize:11,color:T.sub,fontWeight:700,letterSpacing:1.2,marginBottom:8}}>RÉÉCRIS CETTE PHRASE</div>
+                      <div style={{fontSize:14,fontWeight:700,color:"#F87171",lineHeight:1.5,userSelect:"none"}}>
+                        {expectedPhrase}
+                      </div>
+                    </div>
+                    <textarea
+                      value={phraseInput}
+                      onChange={e=>setUrgencyModal(u=>({...u,phraseInput:e.target.value}))}
+                      placeholder="Tape la phrase ici…"
+                      rows={3}
+                      style={{width:"100%",padding:"11px 12px",borderRadius:10,border:`1.5px solid ${phraseOk?"#34D399":phraseInput.length>0?"#F87171":T.border}`,background:T.bg,color:T.text,fontSize:13,outline:"none",marginBottom:16,boxSizing:"border-box",resize:"none",fontFamily:"inherit",lineHeight:1.5}}
+                    />
+                    {phraseInput.length>0&&!phraseOk&&(
+                      <div style={{fontSize:11,color:"#F87171",marginBottom:12,textAlign:"center"}}>
+                        Pas encore correct — vérifie le montant et la description.
+                      </div>
+                    )}
+                    <div style={{display:"flex",gap:10}}>
+                      <button onClick={()=>setUrgencyModal(u=>({...u,step:"confirm"}))}
+                        style={{flex:1,padding:"13px 0",borderRadius:12,border:`1px solid ${T.border}`,background:"none",color:T.sub,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                        ← Retour
+                      </button>
+                      <button onClick={()=>{
+                        if(!phraseOk) return;
+                        setUrgencyModal(u=>({...u,step:"pin",pinInput:"",pinError:false}));
+                      }}
+                        disabled={!phraseOk}
+                        style={{flex:2,padding:"13px 0",borderRadius:12,border:"none",background:phraseOk?"#F87171":T.muted,color:phraseOk?"#020303":T.sub,fontSize:14,fontWeight:800,cursor:phraseOk?"pointer":"not-allowed"}}>
+                        Confirmer → PIN
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+
+              {/* Étape 3 — PIN */}
               {urgencyModal.step==="pin"&&(
                 <>
                   <div style={{textAlign:"center",marginBottom:24}}>
@@ -2853,8 +3176,8 @@ export default function App() {
                       );
                     })}
                   </div>
-                  <button onClick={()=>setUrgencyModal(u=>({...u,step:"confirm"}))}
-                    style={{width:"100%",marginTop:20,padding:"11px 0",borderRadius:12,border:`1px solid ${T.border}`,background:"none",color:"#3A6040",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                  <button onClick={()=>setUrgencyModal(u=>({...u,step:"phrase"}))}
+                    style={{width:"100%",marginTop:20,padding:"11px 0",borderRadius:12,border:`1px solid ${T.border}`,background:"none",color:T.sub,fontSize:13,fontWeight:600,cursor:"pointer"}}>
                     ← Retour
                   </button>
                 </>
