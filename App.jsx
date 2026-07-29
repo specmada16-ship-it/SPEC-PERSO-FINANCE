@@ -2865,19 +2865,21 @@ export default function App() {
                         <span style={{fontSize:11,color:envTextColor(env.color),fontWeight:700,letterSpacing:1.5}}>{env.label.toUpperCase()}</span>
                       </div>
                       <div style={{background:T.card,borderRadius:16,overflow:"hidden",border:`1px solid ${T.border}`,marginBottom:10}}>
-                        {scs.length===0&&<div style={{padding:"12px 16px",fontSize:13,color:T.sub}}>Aucune sous-catégorie</div>}
+                        {scs.length===0&&<div style={{padding:"12px 16px",fontSize:13,color:T.sub}}>{env.system?"Passe par Urgence ou Sinking Fund":"Aucune sous-catégorie"}</div>}
                         {scs.map((sc,i)=>(
                           <SubcatRow key={sc.id} sc={sc} env={env} subcats={subcats} setSub={setSub}
                             editingSubcat={editingSubcat} setESC={setESC} editingSubLabel={editingSubLabel} setESL={setESL}
                             isLast={i===scs.length-1}/>
                         ))}
                       </div>
+                      {!env.system&&(
                       <div style={{display:"flex",gap:8}}>
                         <input value={newScEnv===env.id?newScLabel:""} onChange={e=>{setNSL(e.target.value);setNSE(env.id);}} placeholder={`+ Sous-catégorie ${env.label}`} style={{...inp,flex:1,fontSize:13}} onFocus={()=>setNSE(env.id)}/>
                         <button onClick={()=>{ if(!newScLabel.trim()||newScEnv!==env.id) return; setSub([...subcats,{id:uid(),label:newScLabel.trim(),envelopeId:env.id}]); setNSL(""); setNSE(""); fbFlash(setASCF); }} style={{padding:"10px 14px",borderRadius:12,border:"none",background:addScFeedback?"#34D399":env.color,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,transition:"all .2s"}}>
                           {addScFeedback?"✅":"+"}
                         </button>
                       </div>
+                      )}
                     </div>
                   );
                 })}
