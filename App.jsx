@@ -1521,9 +1521,8 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
   const { envId, envLabel, currentBal, amt, shortage } = overdraft;
   const [selectedFallback, setSelectedFallback] = useState(null);
   const fallbackEnvs = envelopes.filter(e=>e.id!==envId&&e.id!=="tresorerie"&&(bal[e.id]||0)>0);
-  const fallbackBal = selectedFallback ? (bal[selectedFallback]||0) : 0;
-  const covered     = selectedFallback ? Math.min(shortage, fallbackBal) : 0;
-  const remaining   = shortage - covered;
+  const fallbackBal  = selectedFallback ? (bal[selectedFallback]||0) : 0;
+  const hasFallbacks = fallbackEnvs.length > 0;
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(2,3,3,0.96)",zIndex:900,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",padding:"0 0 32px"}}>
@@ -1533,7 +1532,7 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
           <span style={{fontSize:22}}>⚠️</span>
           <div>
             <div style={{fontSize:16,fontWeight:800,color:"#F87171"}}>Solde insuffisant</div>
-            <div style={{fontSize:12,color:"#3A6040"}}>{envLabel} — {fmt(currentBal)} disponible</div>
+            <div style={{fontSize:12,color:T.sub}}>{envLabel} — {fmt(currentBal)} disponible</div>
           </div>
         </div>
 
@@ -1552,67 +1551,72 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
           </div>
         </div>
 
-        <div style={{fontSize:11,fontWeight:700,color:T.sub,letterSpacing:1.5,marginBottom:10}}>
-          COUVRIR LE MANQUE DEPUIS
-        </div>
-
-        {fallbackEnvs.length===0?(
-          <div style={{padding:"12px 14px",borderRadius:12,background:T.isDark?"#1A0808":"#FEE2E2",border:"1px solid #F8717140",marginBottom:16}}>
-            <div style={{fontSize:13,color:"#F87171",fontWeight:600}}>Aucune enveloppe disponible</div>
-            <div style={{fontSize:11,color:T.sub,marginTop:4}}>Le manque de {fmt(shortage)} passera en négatif sur {envLabel}.</div>
-          </div>
-        ):(
-          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
-            {fallbackEnvs.map(e=>{
-              const active = selectedFallback===e.id;
-              const eBal   = bal[e.id]||0;
-              const canCover = Math.min(shortage, eBal);
-              return (
-                <button key={e.id} onClick={()=>setSelectedFallback(active?null:e.id)}
-                  style={{padding:"11px 14px",borderRadius:12,border:`1.5px solid ${active?e.color:"#122416"}`,background:active?T.card2:T.bg,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:e.color}}/>
-                    <span style={{fontSize:13,fontWeight:700,color:active?e.color:"#E8FFD4"}}>{e.label}</span>
-                  </div>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:12,fontWeight:700,color:active?e.color:"#3A6040"}}>{fmt(eBal)}</div>
-                    {active&&<div style={{fontSize:10,color:"#3A6040"}}>couvre {fmt(canCover)}</div>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {selectedFallback&&(
-          <div style={{background:T.card2,borderRadius:12,padding:"12px 14px",marginBottom:16,border:`1px solid ${T.border}`}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:12,color:T.sub}}>{envLabel} après</span>
-              <span style={{fontSize:13,fontWeight:700,color:"#F87171"}}>{fmt(currentBal-amt)}</span>
+        {hasFallbacks ? (
+          <>
+            <div style={{fontSize:11,fontWeight:700,color:T.sub,letterSpacing:1.5,marginBottom:10}}>
+              PAYER DEPUIS UNE AUTRE ENVELOPPE
             </div>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:12,color:T.sub}}>{envelopes.find(e=>e.id===selectedFallback)?.label} après</span>
-              <span style={{fontSize:13,fontWeight:700,color:T.text}}>{fmt(fallbackBal-covered)}</span>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+              {fallbackEnvs.map(e=>{
+                const active = selectedFallback===e.id;
+                const eBal = bal[e.id]||0;
+                return (
+                  <button key={e.id} onClick={()=>setSelectedFallback(active?null:e.id)}
+                    style={{padding:"11px 14px",borderRadius:12,border:`1.5px solid ${active?e.color:T.border}`,background:active?T.card2:T.bg,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:8,height:8,borderRadius:"50%",background:e.color}}/>
+                      <span style={{fontSize:13,fontWeight:700,color:active?e.color:T.text}}>{e.label}</span>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:active?e.color:T.sub}}>{fmt(eBal)}</div>
+                      {active&&<div style={{fontSize:10,color:T.sub}}>→ {fmt(eBal-amt)} après</div>}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            {remaining>0&&(
-              <div style={{display:"flex",justifyContent:"space-between",borderTop:`1px solid ${T.border}`,paddingTop:6}}>
-                <span style={{fontSize:11,color:"#F87171"}}>Reste en négatif</span>
-                <span style={{fontSize:12,fontWeight:700,color:"#F87171"}}>{fmt(remaining)}</span>
+            {selectedFallback&&(
+              <div style={{background:T.card2,borderRadius:12,padding:"10px 14px",marginBottom:16,border:`1px solid ${T.border}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:12,color:T.sub}}>{envLabel} après</span>
+                  <span style={{fontSize:13,fontWeight:700,color:T.sub}}>{fmt(currentBal)} (inchangé)</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:12,color:T.sub}}>{envelopes.find(e=>e.id===selectedFallback)?.label} après</span>
+                  <span style={{fontSize:13,fontWeight:700,color:fallbackBal>=amt?T.text:"#F87171"}}>{fmt(fallbackBal-amt)}</span>
+                </div>
               </div>
             )}
-          </div>
+            <div style={{display:"flex",gap:10,paddingBottom:8}}>
+              <button onClick={onCancel}
+                style={{flex:1,padding:"13px 0",borderRadius:12,border:`1px solid ${T.border}`,background:"none",color:T.sub,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                Annuler
+              </button>
+              <button onClick={()=>{ if(selectedFallback) onConfirm(selectedFallback); }}
+                disabled={!selectedFallback}
+                style={{flex:2,padding:"13px 0",borderRadius:12,border:"none",background:selectedFallback?"#F87171":T.muted,color:selectedFallback?"#020303":T.sub,fontSize:14,fontWeight:800,cursor:selectedFallback?"pointer":"not-allowed"}}>
+                Confirmer
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{padding:"12px 14px",borderRadius:12,background:T.isDark?"#1A0808":"#FEE2E2",border:"1px solid #F8717140",marginBottom:16}}>
+              <div style={{fontSize:13,color:"#F87171",fontWeight:600}}>Aucune enveloppe disponible</div>
+              <div style={{fontSize:11,color:T.sub,marginTop:4}}>Toutes tes enveloppes sont vides. La dépense passera en négatif sur {envLabel}.</div>
+            </div>
+            <div style={{display:"flex",gap:10,paddingBottom:8}}>
+              <button onClick={onCancel}
+                style={{flex:1,padding:"13px 0",borderRadius:12,border:`1px solid ${T.border}`,background:"none",color:T.sub,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                Annuler
+              </button>
+              <button onClick={()=>onConfirm(null)}
+                style={{flex:2,padding:"13px 0",borderRadius:12,border:"none",background:"#F87171",color:"#020303",fontSize:14,fontWeight:800,cursor:"pointer"}}>
+                Forcer (négatif)
+              </button>
+            </div>
+          </>
         )}
-
-        <div style={{display:"flex",gap:10,paddingBottom:8}}>
-          <button onClick={onCancel}
-            style={{flex:1,padding:"13px 0",borderRadius:12,border:`1px solid ${T.border}`,background:"none",color:"#3A6040",fontSize:14,fontWeight:700,cursor:"pointer"}}>
-            Annuler
-          </button>
-          <button onClick={()=>onConfirm(selectedFallback)}
-            style={{flex:2,padding:"13px 0",borderRadius:12,border:"none",background:"#F87171",color:"#020303",fontSize:14,fontWeight:800,cursor:"pointer"}}>
-            {!selectedFallback ? "Forcer (négatif)" : "Confirmer"}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -2039,10 +2043,13 @@ export default function App() {
 
     if(amt > currentBal) {
       // Trigger overdraft modal
+      // shortage = only what the main envelope can't cover (ignore existing negative)
+      const availFromMain = Math.max(0, currentBal);
+      const shortage = amt - availFromMain;
       const env = envelopes.find(e=>e.id===envId);
       setOverdraft({
         tx, envId, envLabel:env?.label||envId,
-        currentBal, amt, shortage: amt - currentBal,
+        currentBal, amt, shortage,
       });
       return;
     }
@@ -2062,21 +2069,21 @@ export default function App() {
     const { tx, envId, currentBal, amt, shortage } = overdraft;
     const nb = {...bal};
 
-    // Main envelope goes negative
-    nb[envId] = currentBal - amt;
-
-    // Fallback envelope covers what it can
-    if(fallbackEnvId && fallbackEnvId !== envId) {
-      const fallbackBal = nb[fallbackEnvId]||0;
-      const covered = Math.min(shortage, Math.max(0, fallbackBal));
-      if(covered > 0) nb[fallbackEnvId] = fallbackBal - covered;
+    if(fallbackEnvId) {
+      // Fallback pays the full amount — main envelope untouched
+      nb[fallbackEnvId] = (nb[fallbackEnvId]||0) - amt;
+    } else {
+      // Force negative — main envelope goes negative
+      nb[envId] = currentBal - amt;
     }
 
     setBal(nb);
     setTxs([tx,...txs]);
     setOverdraft(null);
     setAmount(""); setLabel(""); setNote(""); setShowNote(false); setRecur("none");
-    setTxDate(new Date().toISOString().slice(0,10)); setTab("home");
+    setTxDate(new Date().toISOString().slice(0,10));
+    fbFlash(setSubmitFeedback);
+    setTimeout(()=>setTab("home"), 1200);
   }
 
   function recalcBal(remainingTxs) {
@@ -2173,8 +2180,13 @@ export default function App() {
       const tx={ id:uid(), date:new Date().toISOString(), type:"expense", amount:re.amount, label:re.label, note:"Récurrent", incomeType:"", subcatId:re.subcatId, recur:re.period };
       setBal(b=>{
         const nb={...b};
-        nb[envId]=(nb[envId]||0)-re.amount;
-        if(fromEnvId && shortage>0) nb[fromEnvId]=(nb[fromEnvId]||0)-shortage;
+        if(fromEnvId) {
+          // Fallback pays full amount — main envelope untouched
+          nb[fromEnvId] = (nb[fromEnvId]||0) - re.amount;
+        } else {
+          // Force negative
+          nb[envId] = (nb[envId]||0) - re.amount;
+        }
         return nb;
       });
       setTxs(t=>[tx,...t]);
@@ -2186,7 +2198,8 @@ export default function App() {
       doRecord(null, 0);
     } else {
       // Insufficient — trigger overdraft modal
-      const shortage = re.amount - currentBal;
+      const availFromMain = Math.max(0, currentBal);
+      const shortage = re.amount - availFromMain;
       const env = envelopes.find(e=>e.id===envId);
       setOverdraft({
         amt: re.amount,
@@ -2194,8 +2207,8 @@ export default function App() {
         envLabel: env?.label||"",
         currentBal,
         shortage,
-        onConfirm:(fallbackEnvId, covered)=>{
-          doRecord(fallbackEnvId, covered);
+        onConfirm:(fallbackEnvId)=>{
+          doRecord(fallbackEnvId, shortage);
           setOverdraft(null);
         }
       });
