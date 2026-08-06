@@ -2002,10 +2002,12 @@ export default function App() {
       return;
     }
     // Enregistrer la dépense urgence
+    // directEnvelopeId garantit que recalcBal débite toujours la Trésorerie,
+    // même si aucun subcat n'est lié à cette enveloppe
     const sc = subcats.find(s=>s.envelopeId==="tresorerie");
     const tx = { id:uid(), date:new Date().toISOString(), type:"expense", amount,
       label:`🚨 ${urgencyModal.label.trim()}`, note:"Urgence Trésorerie",
-      subcatId:sc?.id||"", incomeType:"", recur:"none" };
+      subcatId:sc?.id||"", directEnvelopeId:"tresorerie", incomeType:"", recur:"none" };
     setTxs(t=>[tx,...t]);
     setBal(b=>({...b, tresorerie:(b.tresorerie||0)-amount}));
     setUrgencyModal({step:"done", amt:urgencyModal.amt, label:urgencyModal.label});
@@ -2077,8 +2079,11 @@ export default function App() {
       nb[envId] = currentBal - amt;
     }
 
+    const finalTx = fallbackEnvId
+      ? { ...tx, fallbackEnvId, fallbackCovered: amt, fallbackOnly: true }
+      : tx;
     setBal(nb);
-    setTxs([tx,...txs]);
+    setTxs([finalTx,...txs]);
     setOverdraft(null);
     setAmount(""); setLabel(""); setNote(""); setShowNote(false); setRecur("none");
     setTxDate(new Date().toISOString().slice(0,10));
@@ -2101,10 +2106,18 @@ export default function App() {
           }
         });
       } else {
-        const sc = subcats.find(s=>s.id===tx.subcatId);
-        if(sc?.envelopeId) nb[sc.envelopeId] = (nb[sc.envelopeId]||0) - tx.amount;
-        if(tx.fallbackEnvId && tx.fallbackCovered) {
-          nb[tx.fallbackEnvId] = (nb[tx.fallbackEnvId]||0) - tx.fallbackCovered;
+        // directEnvelopeId : transaction urgence sans subcat (ex: Urgence Trésorerie)
+        if(tx.directEnvelopeId) {
+          nb[tx.directEnvelopeId] = (nb[tx.directEnvelopeId]||0) - tx.amount;
+        } else {
+          const sc = subcats.find(s=>s.id===tx.subcatId);
+          // fallbackOnly = true → l'enveloppe principale n'a rien payé, ne pas la débiter
+          if(sc?.envelopeId && !tx.fallbackOnly) {
+            nb[sc.envelopeId] = (nb[sc.envelopeId]||0) - tx.amount;
+          }
+          if(tx.fallbackEnvId && tx.fallbackCovered) {
+            nb[tx.fallbackEnvId] = (nb[tx.fallbackEnvId]||0) - tx.fallbackCovered;
+          }
         }
       }
     });
