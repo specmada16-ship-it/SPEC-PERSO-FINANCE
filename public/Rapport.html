@@ -762,7 +762,11 @@ function showStatus(msg, type) {
   el.textContent = msg; el.className = `status visible ${type||''}`;
 }
 
-function fmtAr(n) { return new Intl.NumberFormat('fr-FR').format(Math.round(n)) + ' Ar'; }
+function fmtAr(n) {
+  const s = String(Math.round(Math.abs(n)));
+  const grouped = s.replace(/\B(?=(\d{3})+(?!\d))/g, '\u0020');
+  return (n < 0 ? '-' : '') + grouped + ' Ar';
+}
 
 function fmtDateFR(iso) {
   if (!iso) return '';
@@ -1017,7 +1021,13 @@ function buildPDF() {
   doc.save(`rapport-${profile.toLowerCase()}-${from}-${to}.pdf`);
 }
 
-function fmtAr(n) { return new Intl.NumberFormat('fr-FR').format(Math.round(n))+' Ar'; }
+function fmtAr(n) {
+  const s = Math.round(n).toString();
+  const neg = s.startsWith('-');
+  const digits = neg ? s.slice(1) : s;
+  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return (neg ? '-' : '') + grouped + ' Ar';
+}
 function fmtDateFR(iso) { if(!iso)return''; return new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}); }
 function fmtDateShort(iso) { if(!iso)return''; return new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short'}); }
 </script>
