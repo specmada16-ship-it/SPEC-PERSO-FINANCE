@@ -1036,7 +1036,7 @@ function buildPDF() {
     doc.text(scName,ML+DC[0]+DC[1]+4,y+5);
     doc.text(envLabel,ML+DC[0]+DC[1]+DC[2]+4,y+5);
     doc.setFont('helvetica','bold'); setTxt(C.red);
-    doc.text('\u2212 '+fmtAr(tx.amount),ML+W-4,y+5,{align:'right'});
+    doc.text('− '+fmtAr(tx.amount),ML+W-4,y+5,{align:'right'});
     setDraw(C.gray3);doc.setLineWidth(0.2);doc.line(ML,y+7.5,ML+W,y+7.5);
     y+=7.5;
   });
@@ -1045,7 +1045,7 @@ function buildPDF() {
   setDraw(C.gray2); doc.setLineWidth(0.5); doc.line(ML,y,ML+W,y);
   doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt(C.black);
   doc.text('Total dépenses',ML+4,y+5);
-  setTxt(C.red); doc.text('\u2212 '+fmtAr(totalExpense),ML+W-4,y+5,{align:'right'});
+  setTxt(C.red); doc.text('− '+fmtAr(totalExpense),ML+W-4,y+5,{align:'right'});
   y+=15;
 
   // ── FOOTER ──────────────────────────────────────────────────────────────
