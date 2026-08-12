@@ -981,35 +981,72 @@ function buildPDF() {
   setTxt(C.black); doc.text('100%',ML+W-4,y+5,{align:'right'});
   y += 15;
 
-  // ── TRANSACTIONS ────────────────────────────────────────────────────────
+  // ── REVENUS ────────────────────────────────────────────────────────────
   pageCheck(20);
-  y = secLabel('Détail des transactions', y);
-  const TC=[W*0.09,W*0.35,W*0.17,W*0.12,W*0.27];
-  y = tblHeader(y, TC, ['Date','Libellé','Catégorie','','Montant']);
+  y = secLabel('Revenus', y);
+  const incomes = sorted.filter(t=>t.type==='income');
+  const RC=[W*0.09,W*0.46,W*0.27,W*0.18];
+  y = tblHeader(y, RC, ['Date','Libellé','Type de revenu','Montant']);
 
-  sorted.forEach((tx,i) => {
+  incomes.forEach((tx,i) => {
     pageCheck(10);
     const dt=tx.date.slice(8,10)+'/'+tx.date.slice(5,7);
-    const sc=subMap[tx.subcatId]; const scName=sc?sc.label:'';
-    const label=tx.label||scName;
+    const label=tx.label||'—';
     const it=(irMap[tx.incomeType]||{}).label||'';
-    const isInc=tx.type==='income';
-    const mc=isInc?C.green:C.red;
-    setFill(i%2===0?C.white:C.gray4); doc.rect(ML,y,W,9,'F');
+    setFill(i%2===0?C.white:C.gray4); doc.rect(ML,y,W,7.5,'F');
     doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
-    setTxt(C.gray2); doc.text(dt,ML+4,y+3.8);
+    setTxt(C.gray2); doc.text(dt,ML+4,y+5);
     doc.setFont('helvetica','bold'); setTxt(C.black);
-    doc.text((label.length>30?label.slice(0,29)+'…':label),ML+TC[0]+4,y+3.8);
-    doc.setFont('helvetica','normal'); doc.setFontSize(7); setTxt(C.gray2);
-    doc.text(it,ML+TC[0]+4,y+7.4);
-    doc.setFontSize(8.5); setTxt(C.gray1);
-    doc.text(scName,ML+TC[0]+TC[1]+4,y+5.5);
-    setTxt(mc); doc.text(isInc?'Revenu':'Dépense',ML+TC[0]+TC[1]+TC[2]+4,y+5.5);
-    doc.setFont('helvetica','bold'); setTxt(mc);
-    doc.text((isInc?'+ ':'\u2212 ')+fmtAr(tx.amount),ML+W-4,y+5.5,{align:'right'});
-    setDraw(C.gray3);doc.setLineWidth(0.2);doc.line(ML,y+9,ML+W,y+9);
-    y+=9;
+    doc.text((label.length>34?label.slice(0,33)+'…':label),ML+RC[0]+4,y+5);
+    doc.setFont('helvetica','normal'); setTxt(C.gray1);
+    doc.text((it.length>22?it.slice(0,21)+'…':it),ML+RC[0]+RC[1]+4,y+5);
+    doc.setFont('helvetica','bold'); setTxt(C.green);
+    doc.text('+ '+fmtAr(tx.amount),ML+W-4,y+5,{align:'right'});
+    setDraw(C.gray3);doc.setLineWidth(0.2);doc.line(ML,y+7.5,ML+W,y+7.5);
+    y+=7.5;
   });
+  // Total revenus
+  setFill(C.gray3); doc.rect(ML,y,W,7.5,'F');
+  setDraw(C.gray2); doc.setLineWidth(0.5); doc.line(ML,y,ML+W,y);
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt(C.black);
+  doc.text('Total revenus',ML+4,y+5);
+  setTxt(C.green); doc.text('+ '+fmtAr(totalIncome),ML+W-4,y+5,{align:'right'});
+  y+=15;
+
+  // ── DÉPENSES ────────────────────────────────────────────────────────────
+  pageCheck(20);
+  y = secLabel('Dépenses', y);
+  const expenses = sorted.filter(t=>t.type==='expense');
+  const DC=[W*0.09,W*0.32,W*0.18,W*0.18,W*0.23];
+  y = tblHeader(y, DC, ['Date','Libellé','Catégorie','Enveloppe','Montant']);
+
+  expenses.forEach((tx,i) => {
+    pageCheck(10);
+    const dt=tx.date.slice(8,10)+'/'+tx.date.slice(5,7);
+    const sc=subMap[tx.subcatId];
+    const scName=sc?sc.label:'';
+    const envLabel=sc?(env.find(e=>e.id===sc.envelopeId)||{}).label||'':'';
+    const label=tx.label||scName||'—';
+    setFill(i%2===0?C.white:C.gray4); doc.rect(ML,y,W,7.5,'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+    setTxt(C.gray2); doc.text(dt,ML+4,y+5);
+    doc.setFont('helvetica','bold'); setTxt(C.black);
+    doc.text((label.length>24?label.slice(0,23)+'…':label),ML+DC[0]+4,y+5);
+    doc.setFont('helvetica','normal'); setTxt(C.gray1);
+    doc.text(scName,ML+DC[0]+DC[1]+4,y+5);
+    doc.text(envLabel,ML+DC[0]+DC[1]+DC[2]+4,y+5);
+    doc.setFont('helvetica','bold'); setTxt(C.red);
+    doc.text('− '+fmtAr(tx.amount),ML+W-4,y+5,{align:'right'});
+    setDraw(C.gray3);doc.setLineWidth(0.2);doc.line(ML,y+7.5,ML+W,y+7.5);
+    y+=7.5;
+  });
+  // Total dépenses
+  setFill(C.gray3); doc.rect(ML,y,W,7.5,'F');
+  setDraw(C.gray2); doc.setLineWidth(0.5); doc.line(ML,y,ML+W,y);
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt(C.black);
+  doc.text('Total dépenses',ML+4,y+5);
+  setTxt(C.red); doc.text('− '+fmtAr(totalExpense),ML+W-4,y+5,{align:'right'});
+  y+=15;
 
   // ── FOOTER ──────────────────────────────────────────────────────────────
   const fy=PH-14;
