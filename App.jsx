@@ -2096,13 +2096,22 @@ export default function App() {
     const nb = {};
     envelopes.forEach(e => nb[e.id] = 0);
     const nm = {};
-    remainingTxs.forEach(tx => {
+    // txs est stocké du plus récent au plus ancien → on rejoue dans l'ordre chronologique
+    // (sinon les dépenses sont soustraites avant les revenus et le max = solde actuel → barres à 100%)
+    const ordered = remainingTxs
+      .map((tx,i)=>({tx,i}))
+      .sort((a,b)=>{
+        const d = new Date(a.tx.date) - new Date(b.tx.date);
+        return d !== 0 ? d : b.i - a.i; // égalité de date : le plus bas dans la liste = le plus ancien
+      })
+      .map(o=>o.tx);
+    ordered.forEach(tx => {
       if(tx.type==="income") {
         const rule = incomeRules[tx.incomeType];
         if(rule) Object.entries(rule.split).forEach(([k,p]) => {
           if(p) {
             nb[k] = (nb[k]||0) + tx.amount*p/100;
-            if((nb[k]||0) > (nm[k]||0)) nm[k] = nb[k];
+            nm[k] = nb[k]; // même logique que submit() : référence = solde après le dernier revenu
           }
         });
       } else {
