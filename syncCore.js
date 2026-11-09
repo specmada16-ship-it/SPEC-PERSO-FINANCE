@@ -30,6 +30,21 @@ function unionById(a, b) {
   return out;
 }
 
+// Règle des barres de progression, appliquée à chaque revenu (une seule définition pour toute l'app).
+// nb = soldes, nm = références (max) — modifiés en place.
+//  - revenu normal : la référence ne baisse jamais ; elle monte si le nouveau solde la dépasse.
+//    Si l'enveloppe était vide (solde <= 0) ou sans référence : nouveau cycle → barre à 100 %.
+//  - reset = true (case cochée à l'ajout du revenu) : TOUTES les barres repartent à 100 %.
+export function applyIncome(nb, nm, split, amount, envIds, reset) {
+  Object.entries(split || {}).forEach(([k, p]) => {
+    if (!p) return;
+    const prev = nb[k] || 0;
+    nb[k] = prev + (amount * p) / 100;
+    nm[k] = prev <= 0 || !nm[k] ? nb[k] : Math.max(nm[k], nb[k]);
+  });
+  if (reset) (envIds || []).forEach((id) => { nm[id] = Math.max(0, nb[id] || 0); });
+}
+
 // Rejoue toutes les transactions depuis zéro — miroir exact de recalcBal() dans App.jsx
 export function recalcPure(txs, envelopes, subcats, incomeRules) {
   const nb = {};
@@ -45,13 +60,7 @@ export function recalcPure(txs, envelopes, subcats, incomeRules) {
   ordered.forEach((tx) => {
     if (tx.type === "income") {
       const rule = incomeRules[tx.incomeType];
-      if (rule)
-        Object.entries(rule.split).forEach(([k, p]) => {
-          if (p) {
-            nb[k] = (nb[k] || 0) + (tx.amount * p) / 100;
-            nm[k] = nb[k];
-          }
-        });
+      if (rule) applyIncome(nb, nm, rule.split, tx.amount, envelopes.map((e) => e.id), tx.resetBars);
     } else if (tx.directEnvelopeId) {
       nb[tx.directEnvelopeId] = (nb[tx.directEnvelopeId] || 0) - tx.amount;
     } else {

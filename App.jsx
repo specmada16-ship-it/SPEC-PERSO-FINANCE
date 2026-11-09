@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { cloudEnabled, supabase, syncAll, addTombstones, queueProfileDelete, resetSyncState } from "./sync.js";
+import { applyIncome } from "./syncCore.js";
 
 // ─── RESPONSIVE HOOK ──────────────────────────────────────────────────────────
 function useIsDesktop() {
@@ -1855,6 +1856,7 @@ export default function App() {
   const [note,setNote]         = useState("");
   const [showNote,setShowNote] = useState(false);
   const [recur,setRecur]       = useState("none");
+  const [resetBars,setResetBars] = useState(false); // revenu : remettre toutes les barres à 100 %
   const [txDate,setTxDate]     = useState(new Date().toISOString().slice(0,10));
 
   // Category manager
@@ -2144,16 +2146,15 @@ export default function App() {
 
   function submit() {
     if(!amt) return;
-    const tx={ id:uid(), date:new Date(txDate).toISOString(), type:addMode, amount:amt, label, note, incomeType, subcatId, recur };
+    const tx={ id:uid(), date:new Date(txDate).toISOString(), type:addMode, amount:amt, label, note, incomeType, subcatId, recur, ...(addMode==="income"&&resetBars?{resetBars:true}:{}) };
 
     if(addMode==="income"){
       const rule=incomeRules[incomeType];
       if(!rule) return;
       const nb={...bal}, nm={...envMax};
-      Object.entries(rule.split).forEach(([k,p])=>{
-        if(p){ nb[k]=(nb[k]||0)+amt*p/100; nm[k]=nb[k]; }
-      });
+      applyIncome(nb, nm, rule.split, amt, envelopes.map(e=>e.id), resetBars);
       setBal(nb); setEnvMax(nm); setTxs([tx,...txs]);
+      setResetBars(false);
       setAmount(""); setLabel(""); setNote(""); setShowNote(false); setRecur("none");
       setTxDate(new Date().toISOString().slice(0,10));
       fbFlash(setSubmitFeedback);
@@ -2232,12 +2233,8 @@ export default function App() {
     ordered.forEach(tx => {
       if(tx.type==="income") {
         const rule = incomeRules[tx.incomeType];
-        if(rule) Object.entries(rule.split).forEach(([k,p]) => {
-          if(p) {
-            nb[k] = (nb[k]||0) + tx.amount*p/100;
-            nm[k] = nb[k]; // même logique que submit() : référence = solde après le dernier revenu
-          }
-        });
+        // même règle que submit() (applyIncome) : référence qui ne baisse pas, sauf cycle vide ou remise à 100 % manuelle
+        if(rule) applyIncome(nb, nm, rule.split, tx.amount, envelopes.map(e=>e.id), tx.resetBars);
       } else {
         // directEnvelopeId : transaction urgence sans subcat (ex: Urgence Trésorerie)
         if(tx.directEnvelopeId) {
@@ -2909,6 +2906,16 @@ export default function App() {
                   ))}
                 </div>
                 <div style={{marginBottom:14}}><SplitPreview/></div>
+                <button onClick={()=>setResetBars(v=>!v)}
+                  style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",marginBottom:14,borderRadius:12,textAlign:"left",cursor:"pointer",
+                    border:`1.5px solid ${resetBars?T.accent:T.border}`,background:resetBars?T.accent+"18":T.card}}>
+                  <span style={{width:22,height:22,borderRadius:7,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+                    border:`2px solid ${resetBars?T.accent:T.sub}`,background:resetBars?T.accent:"transparent",color:T.accentBtn,fontSize:14,fontWeight:900}}>{resetBars?"✓":""}</span>
+                  <span style={{flex:1}}>
+                    <span style={{display:"block",fontSize:13,fontWeight:700,color:T.text}}>Remettre les barres à 100 %</span>
+                    <span style={{display:"block",fontSize:11,color:T.sub,marginTop:2,lineHeight:1.4}}>Nouveau point de départ : toutes les barres repartent du solde actuel.</span>
+                  </span>
+                </button>
               </>
             ):(
               <>
