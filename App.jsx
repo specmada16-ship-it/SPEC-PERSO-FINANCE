@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { cloudEnabled, supabase, syncAll, addTombstones, queueProfileDelete, resetSyncState } from "./sync.js";
 
 // ─── RESPONSIVE HOOK ──────────────────────────────────────────────────────────
 function useIsDesktop() {
@@ -1036,7 +1037,7 @@ const I18N = {
 const OB_STEPS_CREATE = ["welcome","profil","devise","enveloppes","subcats","revenus"];
 const OB_STEPS_IMPORT = ["welcome","import_confirm"];
 
-function OnboardingScreen({ onComplete, prefillName="" }) {
+function OnboardingScreen({ onComplete, prefillName="", onCloud=null }) {
   // Onboarding is always dark — override global T for this component's render
   T = DARK_THEME;
 
@@ -1192,6 +1193,14 @@ function OnboardingScreen({ onComplete, prefillName="" }) {
                 )}
                 {importErr&&<div style={{fontSize:11,color:"#F87171",marginTop:6}}>{importErr}</div>}
               </div>
+
+              {onCloud&&(
+                <button onClick={onCloud}
+                  style={{width:"100%",marginTop:12,padding:"16px 20px",borderRadius:14,border:`1px solid ${T.border}`,background:T.card,cursor:"pointer",textAlign:"left"}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#E8FFD4",marginBottom:3}}>☁ Me connecter à mon compte</div>
+                  <div style={{fontSize:12,color:"#3A6040"}}>Retrouve tes profils sauvegardés en ligne sur cet appareil.</div>
+                </button>
+              )}
             </>
           )}
 
@@ -1622,6 +1631,111 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
   );
 }
 
+// ─── CLOUD SCREEN (connexion + synchro) ───────────────────────────────────────
+function CloudScreen({ cloud, onSync, onClose }) {
+  const [email, setEmail] = useState("");
+  const [pwd, setPwd]     = useState("");
+  const [mode, setMode]   = useState("login"); // "login" | "signup"
+  const [busy, setBusy]   = useState(false);
+  const [msg, setMsg]     = useState("");
+
+  const field = { width:"100%", padding:"13px 14px", borderRadius:12, border:`1px solid ${T.border}`, background:T.card, color:T.text, fontSize:15, outline:"none", boxSizing:"border-box", marginBottom:10 };
+
+  async function submit() {
+    if (!email.trim() || pwd.length < 6) { setMsg("Entre un email valide et un mot de passe de 6 caractères minimum."); return; }
+    setBusy(true); setMsg("");
+    try {
+      if (mode === "signup") {
+        const { data, error } = await supabase.auth.signUp({ email: email.trim(), password: pwd });
+        if (error) throw error;
+        if (!data.session) setMsg("Compte créé. Ouvre l'email de confirmation, puis reviens te connecter.");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pwd });
+        if (error) throw error;
+      }
+    } catch (e) {
+      const m = String(e?.message || "");
+      setMsg(/invalid login/i.test(m) ? "Email ou mot de passe incorrect."
+        : /already registered/i.test(m) ? "Cet email a déjà un compte — passe sur « Se connecter »."
+        : /confirm/i.test(m) ? "Confirme d'abord ton email (lien reçu par mail)."
+        : /fetch|network/i.test(m) ? "Pas de connexion internet."
+        : m);
+    }
+    setBusy(false);
+  }
+
+  async function doSignOut() {
+    await supabase.auth.signOut();
+    resetSyncState();
+  }
+
+  const statusLabel = cloud.status === "syncing" ? "Synchronisation…"
+    : cloud.status === "offline" ? "Hors ligne"
+    : cloud.status === "error" ? "Erreur de synchronisation"
+    : cloud.lastAt ? "À jour" : "En attente";
+  const statusColor = cloud.status === "error" ? "#F87171" : cloud.status === "offline" ? "#FBBF24" : T.accentText;
+  const lastTxt = cloud.lastAt ? new Date(cloud.lastAt).toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit" }) : "—";
+
+  const primaryBtn = { width:"100%", padding:"14px 0", borderRadius:14, border:"none", background:T.accent, color:T.accentBtn, fontSize:15, fontWeight:800, cursor:"pointer", marginBottom:10 };
+  const ghostBtn   = { width:"100%", padding:"13px 0", borderRadius:14, border:`1px solid ${T.border}`, background:"none", color:T.sub, fontSize:14, fontWeight:700, cursor:"pointer", marginBottom:10 };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:T.bg,zIndex:1500,overflowY:"auto",fontFamily:"'Space Grotesk','Inter',-apple-system,sans-serif"}}>
+      <div style={{maxWidth:430,margin:"0 auto",padding:"56px 24px 40px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div style={{fontSize:24,fontWeight:800,color:T.text}}>☁ Sauvegarde en ligne</div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:T.sub,fontSize:26,cursor:"pointer"}}>×</button>
+        </div>
+
+        {cloud.user ? (
+          <>
+            <div style={{fontSize:13,color:T.sub,marginBottom:20}}>Connecté : <span style={{color:T.text,fontWeight:700}}>{cloud.user.email}</span></div>
+
+            <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:14,fontWeight:700,color:statusColor}}>{statusLabel}</span>
+                <span style={{fontSize:12,color:T.sub}}>Dernière synchro : {lastTxt}</span>
+              </div>
+              {cloud.msg && <div style={{fontSize:12,color:T.sub,marginTop:8,lineHeight:1.5}}>{cloud.msg}</div>}
+            </div>
+
+            <div style={{fontSize:12,color:T.sub,lineHeight:1.6,marginBottom:20}}>
+              Tes données restent aussi sur cet appareil : l'app marche sans connexion et se synchronise dès que le réseau revient. Sur un autre appareil, connecte-toi avec le même compte pour retrouver tes profils.
+            </div>
+
+            <button onClick={onSync} disabled={cloud.status==="syncing"} style={{...primaryBtn,opacity:cloud.status==="syncing"?0.6:1}}>Synchroniser maintenant</button>
+            <button onClick={onClose} style={ghostBtn}>Fermer</button>
+            <button onClick={doSignOut} style={{...ghostBtn,color:"#F87171",border:"1px solid #F8717140"}}>Se déconnecter</button>
+          </>
+        ) : (
+          <>
+            <div style={{fontSize:13,color:T.sub,marginBottom:20,lineHeight:1.6}}>
+              Sauvegarde tes profils en ligne et retrouve-les sur tous tes appareils avec le même compte.
+            </div>
+
+            <div style={{display:"flex",background:T.card2,borderRadius:12,padding:3,marginBottom:16}}>
+              {[["login","Se connecter"],["signup","Créer un compte"]].map(([id,lbl])=>(
+                <button key={id} onClick={()=>{ setMode(id); setMsg(""); }} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",background:mode===id?T.accent:"transparent",color:mode===id?T.accentBtn:T.sub,fontSize:13,fontWeight:700}}>{lbl}</button>
+              ))}
+            </div>
+
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" autoCapitalize="none" autoComplete="email" style={field}/>
+            <input type="password" value={pwd} onChange={e=>setPwd(e.target.value)} placeholder="Mot de passe (6 caractères min.)" autoComplete={mode==="signup"?"new-password":"current-password"} style={field}
+              onKeyDown={e=>{ if(e.key==="Enter") submit(); }}/>
+
+            {msg && <div style={{fontSize:12,color:/créé|Ouvre/.test(msg)?T.accentText:"#F87171",marginBottom:12,lineHeight:1.5}}>{msg}</div>}
+
+            <button onClick={submit} disabled={busy} style={{...primaryBtn,opacity:busy?0.6:1}}>
+              {busy ? "…" : mode==="signup" ? "Créer mon compte" : "Me connecter"}
+            </button>
+            <button onClick={onClose} style={ghostBtn}>Continuer sans compte</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const isDesktop = useIsDesktop();
   const [unlocked, setUnlocked] = useState(() => load(UNLOCKED_KEY, false));
@@ -1811,6 +1925,12 @@ export default function App() {
     setActiveId(id);
     setTab("home");
     setShowP(false);
+    setAmount(""); setLabel(""); setNote("");
+    reloadProfileState(id);
+  }
+
+  // Recharge l'état React depuis localStorage (utilisé aussi par la synchro cloud)
+  function reloadProfileState(id) {
     setTxs(pload(id,"txs",[]));
     setBal(pload(id,"bal",{survie:0,tresorerie:0,operationnel:0,differable:0}));
     const _envs = pload(id,"env",DEFAULT_ENVELOPES);
@@ -1823,10 +1943,10 @@ export default function App() {
     setEnvMax(pload(id,"max",{}));
     setSF(pload(id,"sinks",[]));
     setRE(pload(id,"re",[]));
-    setAmount(""); setLabel(""); setNote("");
     setCurrency(pload(id,"currency","Ar"));
     setLang(pload(id,"lang","fr"));
     setCoussin(pload(id,"coussin",100000));
+    setSeuils(pload(id, SEUILS_KEY, { alerte:60000, blocage:25000 }));
   }
 
   // Always protect system envelopes
@@ -1842,6 +1962,7 @@ export default function App() {
   }
 
   function resetProfile() {
+    addTombstones(pid, txs.map(t=>t.id));
     const TRES = { id:"tresorerie", label:"Trésorerie", color:"#B4FF00", bg:"#141005", system:true };
     setBal({survie:0,tresorerie:0,operationnel:0,differable:0});
     safeSetEnv(DEFAULT_ENVELOPES);
@@ -1898,6 +2019,8 @@ export default function App() {
         if (!envs.some(x=>x.id==="tresorerie")) envs = [TRES, ...envs];
         envs = envs.map(x=>x.id==="tresorerie"?{...x,system:true}:x);
 
+        // Les transactions absentes du fichier importé sont considérées supprimées (synchro cloud)
+        { const keep = new Set((d.txs||[]).map(t=>t.id)); addTombstones(profileId, pload(profileId,"txs",[]).map(t=>t.id).filter(i=>!keep.has(i))); }
         // Save directly to that profile's storage
         psave(profileId,"txs", d.txs || []);
         psave(profileId,"bal", d.bal || {survie:0,tresorerie:0,operationnel:0,differable:0});
@@ -1962,6 +2085,7 @@ export default function App() {
 
   function deleteProfile(id) {
     if(profiles.length<=1) return;
+    queueProfileDelete(id);
     const remaining = profiles.filter(p=>p.id!==id);
     setProfiles(remaining);
     if(activeId===id) switchProfile(remaining[0].id);
@@ -2137,6 +2261,7 @@ export default function App() {
   }
 
   function deleteTx(txId) {
+    addTombstones(pid, [txId]);
     const remaining = txs.filter(t=>t.id!==txId);
     setTxs(remaining);
     recalcBal(remaining);
@@ -2298,6 +2423,73 @@ export default function App() {
   // Subcats filtered by selected envelope for history
   const filteredSubcats = hEnv==="all" ? subcats : subcats.filter(s=>s.envelopeId===hEnv);
 
+  // ── CLOUD SYNC ──────────────────────────────────────────────────────────────
+  const [showCloud, setShowCloud] = useState(false);
+  const [cloud, setCloud] = useState({ user:null, status:"idle", lastAt:null, msg:"" });
+  const syncingRef = useRef(false);
+  const rerunRef = useRef(false);
+  const activeRef = useRef(pid);            activeRef.current = pid;
+  const profilesRef = useRef(profiles);     profilesRef.current = profiles;
+  const onboardingRef = useRef(onboarding); onboardingRef.current = onboarding;
+  const reloadRef = useRef(null);           reloadRef.current = reloadProfileState;
+  const switchRef = useRef(null);           switchRef.current = switchProfile;
+
+  async function syncNow() {
+    if (!cloudEnabled) return;
+    if (syncingRef.current) { rerunRef.current = true; return; }
+    syncingRef.current = true;
+    setCloud(c => c.user ? { ...c, status:"syncing", msg:"" } : c);
+    try {
+      const res = await syncAll();
+      if (res.skipped) return;
+      if (res.profiles && JSON.stringify(res.profiles) !== JSON.stringify(profilesRef.current)) setProfiles(res.profiles);
+      const cur = activeRef.current;
+      if (res.removed.includes(cur) && res.profiles && res.profiles.length) switchRef.current(res.profiles[0].id);
+      else if (res.changed.includes(cur) || res.created.includes(cur)) reloadRef.current(cur);
+      // Appareil neuf : le profil récupéré du cloud remplace l'écran de configuration
+      if (onboardingRef.current && load(`sf_ob_${onboardingRef.current.profileId}`, false)) setOnboarding(null);
+      setCloud(c => ({ ...c, status:"ok", lastAt:new Date().toISOString(), msg: res.conflict ? "Une modification est arrivée pendant la synchro — elle sera envoyée à la prochaine." : "" }));
+    } catch (e) {
+      const m = String(e?.message || "");
+      const offline = !navigator.onLine || /fetch|network|load failed/i.test(m);
+      setCloud(c => ({ ...c, status: offline ? "offline" : "error", msg: offline ? "Hors ligne — la synchro reprendra au retour du réseau." : (m || "Erreur de synchronisation") }));
+    } finally {
+      syncingRef.current = false;
+      if (rerunRef.current) { rerunRef.current = false; setTimeout(syncNow, 300); }
+    }
+  }
+
+  // Session au démarrage + retour réseau + retour sur l'app
+  useEffect(() => {
+    if (!cloudEnabled) return;
+    supabase.auth.getSession().then(({ data }) => {
+      const u = data.session?.user || null;
+      setCloud(c => ({ ...c, user: u ? { id:u.id, email:u.email } : null }));
+      if (u) syncNow();
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((evt, session) => {
+      const u = session?.user || null;
+      setCloud(c => ({ ...c, user: u ? { id:u.id, email:u.email } : null, status: u ? c.status : "idle", msg: u ? c.msg : "" }));
+      if (evt === "SIGNED_IN" && u) setTimeout(syncNow, 0);
+    });
+    const onOnline = () => syncNow();
+    const onVisible = () => { if (document.visibilityState === "visible") syncNow(); };
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      sub.subscription.unsubscribe();
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  // Envoi automatique ~2,5 s après la dernière modification
+  useEffect(() => {
+    if (!cloud.user) return;
+    const t = setTimeout(syncNow, 2500);
+    return () => clearTimeout(t);
+  }, [txs, bal, envelopes, subcats, incomeRules, envMax, sinkFunds, recurExp, currency, lang, seuils, coussin, profiles, cloud.user?.id]);
+
   // ── LICENSE GATE — check once per device ────────────────────────────────────
   const [licensed, setLicensed] = useState(()=>load(LICENSE_KEY, false));
   if (!licensed) {
@@ -2310,8 +2502,12 @@ export default function App() {
   }
 
   // ── ONBOARDING GATE ──────────────────────────────────────────────────────────
+  if (showCloud) {
+    return <CloudScreen cloud={cloud} onSync={syncNow} onClose={()=>setShowCloud(false)}/>;
+  }
+
   if (onboarding) {
-    return <OnboardingScreen onComplete={completeOnboarding} prefillName={onboarding.prefillName||""}/>;
+    return <OnboardingScreen onComplete={completeOnboarding} prefillName={onboarding.prefillName||""} onCloud={cloudEnabled?()=>setShowCloud(true):null}/>;
   }
 
   return (
@@ -2441,6 +2637,13 @@ export default function App() {
 
           {/* Bottom-right lock controls */}
           <div style={{position:"absolute",bottom:20,right:20,display:"flex",gap:8}}>
+            {cloudEnabled&&(
+              <button onClick={()=>setShowCloud(true)} title="Sauvegarde en ligne" style={{width:40,height:40,borderRadius:12,border:`1px solid ${cloud.user?T.accent+"60":T.border}`,background:T.bg,color:cloud.user?T.accentText:T.sub,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/>
+                </svg>
+              </button>
+            )}
             <button onClick={()=>setShowChangePin(true)} title="Changer le code" style={{width:40,height:40,borderRadius:12,border:`1px solid ${T.accent}60`,background:T.card2+"40",color:T.accentText,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="16" r="1"/><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
@@ -2490,7 +2693,13 @@ export default function App() {
                 <span style={{fontSize:13,fontWeight:700,color:T.text}}>{activeProfile?.name}</span>
                 <span style={{fontSize:11,color:T.sub}}>▾</span>
               </button>
-              <div style={{fontSize:11,color:T.sub,letterSpacing:1}}>{profiles.length} profil{profiles.length>1?"s":""}</div>
+              <div onClick={()=>cloudEnabled&&setShowCloud(true)} style={{fontSize:11,color:cloud.user&&cloud.status==="error"?"#F87171":T.sub,letterSpacing:1,cursor:cloudEnabled?"pointer":"default"}}>
+                {cloudEnabled
+                  ? (cloud.user
+                      ? (cloud.status==="syncing"?"☁ synchro…":cloud.status==="offline"?"☁ hors ligne":cloud.status==="error"?"☁ erreur":"☁ synchronisé")
+                      : "☁ sauvegarde en ligne")
+                  : `${profiles.length} profil${profiles.length>1?"s":""}`}
+              </div>
             </div>
 
             <div style={{fontSize:11,color:T.sub,letterSpacing:2,fontWeight:700,marginBottom:6}}>SOLDE DISPONIBLE</div>
