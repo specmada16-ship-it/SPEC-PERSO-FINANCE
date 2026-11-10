@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { cloudEnabled, supabase, syncAll, addTombstones, queueProfileDelete, resetSyncState } from "./sync.js";
+import { cloudEnabled, supabase, syncAll, addTombstones, queueProfileDelete, resetSyncState, isShared, createInvite, formatCode, joinWithCode, listMembers, removeMember } from "./sync.js";
 import { applyIncome } from "./syncCore.js";
 
 // ─── RESPONSIVE HOOK ──────────────────────────────────────────────────────────
@@ -1633,12 +1633,76 @@ function OverdraftModal({ overdraft, envelopes, bal, fmt, onCancel, onConfirm })
 }
 
 // ─── CLOUD SCREEN (connexion + synchro) ───────────────────────────────────────
-function CloudScreen({ cloud, onSync, onClose }) {
+function CloudScreen({ cloud, profiles, onSync, onJoined, onClose }) {
   const [email, setEmail] = useState("");
   const [pwd, setPwd]     = useState("");
   const [mode, setMode]   = useState("login"); // "login" | "signup"
   const [busy, setBusy]   = useState(false);
   const [msg, setMsg]     = useState("");
+
+  // ── Partage de profils ──
+  const ownProfiles = (profiles||[]).filter(p=>!isShared(p.id));
+  const [shareId, setShareId]     = useState("");
+  const sid = ownProfiles.some(p=>p.id===shareId) ? shareId : (ownProfiles[0]?.id || "");
+  const [code, setCode]           = useState("");
+  const [members, setMembers]     = useState(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareMsg, setShareMsg]   = useState("");
+  const [copied, setCopied]       = useState(false);
+  const [joinCode, setJoinCode]   = useState("");
+  const [joinBusy, setJoinBusy]   = useState(false);
+  const [joinMsg, setJoinMsg]     = useState("");
+
+  const shareErr = (e) => {
+    const m = String(e?.message || "");
+    return /invalid_code/.test(m) ? "Code invalide, expiré ou déjà utilisé."
+      : /own_profile/.test(m) ? "C'est déjà ton propre profil."
+      : /profile_not_found/.test(m) ? "Ce profil n'est pas encore envoyé en ligne. Vérifie ta connexion, attends quelques secondes puis réessaie."
+      : /not_authenticated/.test(m) ? "Connecte-toi d'abord."
+      : /fetch|network|load failed/i.test(m) ? "Pas de connexion internet."
+      : (m || "Erreur");
+  };
+
+  useEffect(()=>{
+    setCode(""); setCopied(false); setShareMsg(""); setMembers(null);
+    if (!cloud.user || !sid) return;
+    let alive = true;
+    listMembers(sid).then(m=>{ if(alive) setMembers(m); }).catch(()=>{});
+    return ()=>{ alive = false; };
+  },[sid, cloud.user?.id]);
+
+  async function genCode() {
+    if (!sid) return;
+    setShareBusy(true); setShareMsg(""); setCopied(false);
+    try {
+      await onSync();                       // le profil doit exister en ligne avant d'être partagé
+      setCode(await createInvite(sid));
+      setMembers(await listMembers(sid));
+    } catch (e) { setShareMsg(shareErr(e)); }
+    setShareBusy(false);
+  }
+  async function copyCode() {
+    try { await navigator.clipboard.writeText(formatCode(code)); setCopied(true); }
+    catch { setShareMsg("Copie impossible : recopie le code à la main."); }
+  }
+  async function dropMember(userId) {
+    setShareBusy(true); setShareMsg("");
+    try { await removeMember(sid, userId); setMembers(await listMembers(sid)); }
+    catch (e) { setShareMsg(shareErr(e)); }
+    setShareBusy(false);
+  }
+  async function join() {
+    if (joinCode.replace(/[^0-9a-fA-F]/g,"").length < 12) { setJoinMsg("Le code a 12 caractères (ex. a8ab-4bec-b71d)."); return; }
+    setJoinBusy(true); setJoinMsg("");
+    try {
+      const localId = await joinWithCode(joinCode.trim());
+      const has = () => load("sf_profiles", []).some(p=>p.id===localId);
+      for (let i = 0; i < 3 && !has(); i++) { await onSync(); if (!has()) await new Promise(r=>setTimeout(r,500)); }
+      if (!has()) { setJoinMsg("Profil rejoint, mais la synchro a échoué. Appuie sur « Synchroniser maintenant »."); }
+      else { setJoinCode(""); onJoined(localId); }
+    } catch (e) { setJoinMsg(shareErr(e)); }
+    setJoinBusy(false);
+  }
 
   const field = { width:"100%", padding:"13px 14px", borderRadius:12, border:`1px solid ${T.border}`, background:T.card, color:T.text, fontSize:15, outline:"none", boxSizing:"border-box", marginBottom:10 };
 
@@ -1705,8 +1769,64 @@ function CloudScreen({ cloud, onSync, onClose }) {
             </div>
 
             <button onClick={onSync} disabled={cloud.status==="syncing"} style={{...primaryBtn,opacity:cloud.status==="syncing"?0.6:1}}>Synchroniser maintenant</button>
+
+            {/* ── Partager un profil ── */}
+            <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:16,marginTop:6,marginBottom:16}}>
+              <div style={{fontSize:14,fontWeight:800,color:T.text,marginBottom:4}}>👥 Partager un profil</div>
+              <div style={{fontSize:12,color:T.sub,lineHeight:1.6,marginBottom:12}}>
+                La personne ne verra que ce profil, jamais les autres. Elle crée son propre compte, puis saisit le code.
+              </div>
+              {ownProfiles.length>0 ? (
+                <>
+                  <select value={sid} onChange={e=>setShareId(e.target.value)} style={field}>
+                    {ownProfiles.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <button onClick={genCode} disabled={shareBusy} style={{...primaryBtn,marginBottom:0,opacity:shareBusy?0.6:1}}>
+                    {shareBusy ? "…" : "Générer un code d'invitation"}
+                  </button>
+                  {code && (
+                    <div style={{textAlign:"center",padding:"14px 10px",borderRadius:12,background:T.card2,border:`1px solid ${T.accent}60`,marginTop:12}}>
+                      <div style={{fontSize:26,fontWeight:800,letterSpacing:3,color:T.accentText,fontFamily:"monospace"}}>{formatCode(code)}</div>
+                      <div style={{fontSize:11,color:T.sub,marginTop:6}}>Valable 48 h · utilisable une seule fois</div>
+                      <button onClick={copyCode} style={{...ghostBtn,marginTop:10,marginBottom:0}}>{copied?"✓ Copié":"Copier le code"}</button>
+                    </div>
+                  )}
+                  {members && members.length>0 && (
+                    <div style={{marginTop:14}}>
+                      <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,marginBottom:6}}>ONT ACCÈS À CE PROFIL</div>
+                      {members.map(m=>(
+                        <div key={m.user_id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"8px 0",borderTop:`1px solid ${T.border}`}}>
+                          <span style={{fontSize:13,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}>{m.email}</span>
+                          <button onClick={()=>dropMember(m.user_id)} disabled={shareBusy} style={{background:"none",border:"1px solid #F8717140",color:"#F87171",borderRadius:10,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Retirer</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {shareMsg && <div style={{fontSize:12,color:"#F87171",marginTop:10,lineHeight:1.5}}>{shareMsg}</div>}
+                </>
+              ) : (
+                <div style={{fontSize:12,color:T.sub}}>Aucun profil à toi à partager pour l'instant.</div>
+              )}
+            </div>
+
+            {/* ── Rejoindre un profil partagé ── */}
+            <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:16,marginBottom:16}}>
+              <div style={{fontSize:14,fontWeight:800,color:T.text,marginBottom:4}}>🔑 Rejoindre un profil partagé</div>
+              <div style={{fontSize:12,color:T.sub,lineHeight:1.6,marginBottom:12}}>
+                Saisis le code reçu : le profil s'ajoute à tes profils. Pour le quitter plus tard : Profils → ×.
+              </div>
+              <input value={joinCode} onChange={e=>setJoinCode(e.target.value)} placeholder="a8ab-4bec-b71d" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                onKeyDown={e=>{ if(e.key==="Enter") join(); }}
+                style={{...field,fontFamily:"monospace",letterSpacing:2}}/>
+              <button onClick={join} disabled={joinBusy} style={{...primaryBtn,marginBottom:0,opacity:joinBusy?0.6:1}}>{joinBusy ? "…" : "Rejoindre"}</button>
+              {joinMsg && <div style={{fontSize:12,color:"#F87171",marginTop:10,lineHeight:1.5}}>{joinMsg}</div>}
+            </div>
+
             <button onClick={onClose} style={ghostBtn}>Fermer</button>
-            <button onClick={doSignOut} style={{...ghostBtn,color:"#F87171",border:"1px solid #F8717140"}}>Se déconnecter</button>
+            <button onClick={doSignOut} style={{...ghostBtn,color:"#F87171",border:"1px solid #F8717140",marginBottom:6}}>Se déconnecter</button>
+            <div style={{fontSize:11,color:T.sub,lineHeight:1.5}}>
+              Tes données restent sur cet appareil. Si quelqu'un se connecte ensuite avec un autre compte sur ce même téléphone, elles seraient envoyées sur son compte.
+            </div>
           </>
         ) : (
           <>
@@ -1790,6 +1910,8 @@ export default function App() {
   // ── Onboarding ──────────────────────────────────────────────────────────────
   // null = no onboarding, { profileId, prefillName } = onboarding in progress
   const [onboarding, setOnboarding] = useState(()=>{
+    // Un profil est déjà configuré (ex. profil partagé rejoint avec un code) : pas d'onboarding
+    if (load("sf_profiles",DEFAULT_PROFILES).some(p=>load(`sf_ob_${p.id}`,false))) return null;
     // Trigger onboarding for default profile if it has never been configured
     const defaultConfigured = load("sf_ob_default", false);
     if (!defaultConfigured) return { profileId:"default", prefillName:"" };
@@ -2431,11 +2553,14 @@ export default function App() {
   const reloadRef = useRef(null);           reloadRef.current = reloadProfileState;
   const switchRef = useRef(null);           switchRef.current = switchProfile;
 
-  async function syncNow() {
-    if (!cloudEnabled) return;
-    if (syncingRef.current) { rerunRef.current = true; return; }
+  const runRef = useRef(null);
+  // Renvoie une promesse terminée à la fin de la synchro (utile pour inviter / rejoindre)
+  function syncNow() {
+    if (!cloudEnabled) return Promise.resolve();
+    if (syncingRef.current) { rerunRef.current = true; return runRef.current || Promise.resolve(); }
     syncingRef.current = true;
     setCloud(c => c.user ? { ...c, status:"syncing", msg:"" } : c);
+    runRef.current = (async () => {
     try {
       const res = await syncAll();
       if (res.skipped) return;
@@ -2445,7 +2570,11 @@ export default function App() {
       else if (res.changed.includes(cur) || res.created.includes(cur)) reloadRef.current(cur);
       // Appareil neuf : le profil récupéré du cloud remplace l'écran de configuration
       if (onboardingRef.current && load(`sf_ob_${onboardingRef.current.profileId}`, false)) setOnboarding(null);
-      setCloud(c => ({ ...c, status:"ok", lastAt:new Date().toISOString(), msg: res.conflict ? "Une modification est arrivée pendant la synchro — elle sera envoyée à la prochaine." : "" }));
+      const notes = [];
+      if (res.removed.length) notes.push("Un profil a été retiré de cet appareil (supprimé ailleurs, ou plus partagé avec toi).");
+      if (res.detached.length) notes.push("L'accès à un profil partagé t'a été retiré. Ta copie reste sur cet appareil mais n'est plus synchronisée.");
+      if (res.conflict) notes.push("Une modification est arrivée pendant la synchro — elle sera envoyée à la prochaine.");
+      setCloud(c => ({ ...c, status:"ok", lastAt:new Date().toISOString(), msg: notes.join(" ") }));
     } catch (e) {
       const m = String(e?.message || "");
       const offline = !navigator.onLine || /fetch|network|load failed/i.test(m);
@@ -2454,6 +2583,22 @@ export default function App() {
       syncingRef.current = false;
       if (rerunRef.current) { rerunRef.current = false; setTimeout(syncNow, 300); }
     }
+    })();
+    return runRef.current;
+  }
+
+  // Après avoir rejoint un profil avec un code : on l'ouvre, et on abandonne l'écran de configuration vide
+  function afterJoin(localId) {
+    const ob = onboardingRef.current;
+    if (ob && ob.profileId !== localId) {
+      if (!load(`sf_ob_${ob.profileId}`, false) && load("sf_profiles", []).length > 1) {
+        Object.keys(localStorage).filter(k=>k.startsWith(`p_${ob.profileId}_`)).forEach(k=>localStorage.removeItem(k));
+        setProfiles(ps=>ps.filter(p=>p.id!==ob.profileId));
+      }
+      setOnboarding(null);
+    }
+    setShowCloud(false);
+    switchProfile(localId);
   }
 
   // Session au démarrage + retour réseau + retour sur l'app
@@ -2500,7 +2645,7 @@ export default function App() {
 
   // ── ONBOARDING GATE ──────────────────────────────────────────────────────────
   if (showCloud) {
-    return <CloudScreen cloud={cloud} onSync={syncNow} onClose={()=>setShowCloud(false)}/>;
+    return <CloudScreen cloud={cloud} profiles={profiles} onSync={syncNow} onJoined={afterJoin} onClose={()=>setShowCloud(false)}/>;
   }
 
   if (onboarding) {
@@ -2578,7 +2723,7 @@ export default function App() {
                     ):(
                       <div style={{fontSize:15,fontWeight:700,color:activeId===p.id?T.accentText:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
                     )}
-                    <div style={{fontSize:11,color:T.sub}}>{activeId===p.id?"Actif":"Appuyer pour switcher"}</div>
+                    <div style={{fontSize:11,color:T.sub}}>{activeId===p.id?"Actif":"Appuyer pour switcher"}{isShared(p.id)?" · 👥 partagé":""}</div>
                   </div>
                   {activeId===p.id&&<span style={{color:T.accentText,fontSize:18,flexShrink:0}}>✓</span>}
 
