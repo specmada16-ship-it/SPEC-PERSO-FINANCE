@@ -45,10 +45,65 @@ export function applyIncome(nb, nm, split, amount, envIds, reset) {
   if (reset) (envIds || []).forEach((id) => { nm[id] = Math.max(0, nb[id] || 0); });
 }
 
-// Rejoue toutes les transactions depuis zéro — miroir exact de recalcBal() dans App.jsx
+// Enveloppe débitée directement par une transaction (urgence, utilisation d'un sinking fund).
+// Les anciennes transactions n'ont pas de directEnvelopeId (et aucune sous-catégorie liée à la
+// Trésorerie n'existe) : on le déduit de leur note, sinon leur effet est perdu à chaque recalcul.
+export function directEnvOf(tx) {
+  if (!tx || tx.type === "income") return null;
+  if (tx.directEnvelopeId) return tx.directEnvelopeId;
+  const note = typeof tx.note === "string" ? tx.note : "";
+  if (note === "Urgence Trésorerie") return "tresorerie";
+  if (note.startsWith("Sinking Fund") && /\(SF\)\s*$/.test(tx.label || "")) return "tresorerie";
+  return null;
+}
+
+// Répartition d'un revenu : celle enregistrée avec la transaction (tx.split) si elle existe,
+// sinon la règle actuelle du type de revenu. Limitée aux enveloppes qui existent encore.
+function incomeSplit(tx, ids, incomeRules) {
+  const raw = tx.split || (incomeRules[tx.incomeType] && incomeRules[tx.incomeType].split);
+  if (!raw) return null;
+  return Object.fromEntries(Object.entries(raw).filter(([k]) => !ids || ids.has(k)));
+}
+
+// Effet d'UNE transaction sur les soldes : { enveloppe: +/- montant }.
+// Sert au rejeu complet ET à l'annulation d'une seule transaction (suppression).
+export function txEffect(tx, ids, subcats, incomeRules) {
+  const d = {};
+  const add = (k, v) => {
+    if (ids && !ids.has(k)) return;
+    d[k] = (d[k] || 0) + v;
+  };
+  if (tx.type === "income") {
+    const sp = incomeSplit(tx, ids, incomeRules);
+    if (sp) Object.entries(sp).forEach(([k, p]) => { if (p) add(k, (tx.amount * p) / 100); });
+    return d;
+  }
+  const direct = directEnvOf(tx);
+  if (direct) {
+    add(direct, -tx.amount);
+    return d;
+  }
+  const sc = subcats.find((s) => s.id === tx.subcatId);
+  if (sc && sc.envelopeId && !tx.fallbackOnly) add(sc.envelopeId, -tx.amount);
+  if (tx.fallbackEnvId && tx.fallbackCovered) add(tx.fallbackEnvId, -tx.fallbackCovered);
+  return d;
+}
+
+// Soldes après suppression d'une transaction : on annule UNIQUEMENT son effet sur les soldes actuels.
+// (Un rejeu complet ferait ressortir tous les écarts des anciennes transactions d'un coup.)
+export function balAfterDelete(bal, removedTx, ids, subcats, incomeRules) {
+  const nb = { ...bal };
+  Object.entries(txEffect(removedTx, ids, subcats, incomeRules)).forEach(([k, v]) => {
+    nb[k] = Math.round(((nb[k] || 0) - v) * 100) / 100;
+  });
+  return nb;
+}
+
+// Rejoue toutes les transactions depuis zéro (soldes + références des barres)
 export function recalcPure(txs, envelopes, subcats, incomeRules) {
   const nb = {};
   envelopes.forEach((e) => (nb[e.id] = 0));
+  const ids = new Set(envelopes.map((e) => e.id));
   const nm = {};
   const ordered = txs
     .map((tx, i) => ({ tx, i }))
@@ -59,16 +114,12 @@ export function recalcPure(txs, envelopes, subcats, incomeRules) {
     .map((o) => o.tx);
   ordered.forEach((tx) => {
     if (tx.type === "income") {
-      const rule = incomeRules[tx.incomeType];
-      if (rule) applyIncome(nb, nm, rule.split, tx.amount, envelopes.map((e) => e.id), tx.resetBars);
-    } else if (tx.directEnvelopeId) {
-      nb[tx.directEnvelopeId] = (nb[tx.directEnvelopeId] || 0) - tx.amount;
+      const sp = incomeSplit(tx, ids, incomeRules);
+      if (sp) applyIncome(nb, nm, sp, tx.amount, [...ids], tx.resetBars);
     } else {
-      const sc = subcats.find((s) => s.id === tx.subcatId);
-      if (sc?.envelopeId && !tx.fallbackOnly)
-        nb[sc.envelopeId] = (nb[sc.envelopeId] || 0) - tx.amount;
-      if (tx.fallbackEnvId && tx.fallbackCovered)
-        nb[tx.fallbackEnvId] = (nb[tx.fallbackEnvId] || 0) - tx.fallbackCovered;
+      Object.entries(txEffect(tx, ids, subcats, incomeRules)).forEach(([k, v]) => {
+        nb[k] = (nb[k] || 0) + v;
+      });
     }
   });
   return { bal: nb, max: nm };

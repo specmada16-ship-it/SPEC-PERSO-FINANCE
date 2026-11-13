@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { cloudEnabled, supabase, syncAll, addTombstones, queueProfileDelete, resetSyncState, isShared, createInvite, formatCode, joinWithCode, listMembers, removeMember } from "./sync.js";
-import { applyIncome } from "./syncCore.js";
+import { applyIncome, txEffect, balAfterDelete, recalcPure } from "./syncCore.js";
 
 // ─── RESPONSIVE HOOK ──────────────────────────────────────────────────────────
 function useIsDesktop() {
@@ -1371,7 +1371,7 @@ function OnboardingScreen({ onComplete, prefillName="", onCloud=null }) {
 }
 
 // ─── PROFILE SETTINGS OVERLAY ────────────────────────────────────────────────
-function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, setSeuils, setCoussin, onToggleTheme, onClose }) {
+function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, setSeuils, setCoussin, setBal, setEnvMax, onToggleTheme, onClose }) {
   const ps_cur    = pload(ps_pid, "currency", "Ar");
   const ps_lang   = pload(ps_pid, "lang", "fr");
   const ps_seuils = pload(ps_pid, SEUILS_KEY, { alerte:60000, blocage:25000 });
@@ -1381,6 +1381,25 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
   const [coussinInput, setCoussinInput] = useState(String(pload(ps_pid,"coussin",100000)));
   const [coussinApplied, setCoussinApplied] = useState(false);
   const [seuilsApplied, setSeuilsApplied] = useState(false);
+  const [audit, setAudit] = useState(null);
+  const [auditDone, setAuditDone] = useState(false);
+
+  // Compare les soldes affichés avec ceux que donne l'historique des transactions
+  function runAudit() {
+    const _env = pload(ps_pid,"env",DEFAULT_ENVELOPES), _sub = pload(ps_pid,"sub",DEFAULT_SUBCATS), _ir = pload(ps_pid,"ir",DEFAULT_INCOME_RULES);
+    const _bal = pload(ps_pid,"bal",{});
+    const r = recalcPure(pload(ps_pid,"txs",[]), _env, _sub, _ir);
+    const rows = _env.map(e=>({ id:e.id, label:e.label, shown:Math.round(_bal[e.id]||0), calc:Math.round(r.bal[e.id]||0) }));
+    setAuditDone(false);
+    setAudit({ rows, bal:r.bal, diff:rows.some(x=>x.shown!==x.calc) });
+  }
+  function applyAudit() {
+    const nb = { ...pload(ps_pid,"bal",{}) }, nm = { ...pload(ps_pid,"max",{}) };
+    Object.keys(audit.bal).forEach(k=>{ nb[k] = Math.round(audit.bal[k]*100)/100; if (nb[k] > (nm[k]||0)) nm[k] = nb[k]; });
+    psave(ps_pid,"bal",nb); psave(ps_pid,"max",nm);
+    if (ps_pid===pid) { setBal(nb); setEnvMax(nm); }
+    setAudit(null); setAuditDone(true);
+  }
 
   function applyCoussin() {
     const v = parseInt(coussinInput) || 100000;
@@ -1514,6 +1533,40 @@ function ProfileSettingsOverlay({ ps_pid, profiles, pid, setLang, setCurrency, s
               </button>
             );
           })}
+        </div>
+
+        {/* VÉRIFIER LES SOLDES */}
+        <div style={{fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1.5,margin:"24px 0 10px"}}>VÉRIFIER LES SOLDES</div>
+        <div style={{background:T.card2,borderRadius:12,padding:14,border:`1px solid ${T.border}`}}>
+          <div style={{fontSize:12,color:T.sub,lineHeight:1.6,marginBottom:12}}>
+            Compare les soldes affichés avec ce que donne l'historique des transactions. Utile si un chiffre te semble faux.
+          </div>
+          <button onClick={runAudit} style={{width:"100%",padding:"11px 0",borderRadius:10,border:`1px solid ${T.border}`,background:"none",color:T.text,fontSize:13,fontWeight:700,cursor:"pointer"}}>Vérifier maintenant</button>
+          {auditDone && <div style={{fontSize:12,color:T.accentText,marginTop:10,fontWeight:700}}>✓ Soldes corrigés d'après l'historique.</div>}
+          {audit && (
+            <div style={{marginTop:12}}>
+              <div style={{display:"flex",fontSize:10,color:T.sub,fontWeight:700,letterSpacing:1,paddingBottom:6,borderBottom:`1px solid ${T.border}`}}>
+                <span style={{flex:1}}>ENVELOPPE</span><span style={{width:92,textAlign:"right"}}>AFFICHÉ</span><span style={{width:92,textAlign:"right"}}>HISTORIQUE</span>
+              </div>
+              {audit.rows.map(r=>(
+                <div key={r.id} style={{display:"flex",alignItems:"center",fontSize:13,padding:"7px 0",borderBottom:`1px solid ${T.border}`,color:r.shown===r.calc?T.sub:"#FBBF24",fontWeight:r.shown===r.calc?500:800}}>
+                  <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.label}</span>
+                  <span style={{width:92,textAlign:"right"}}>{fmt(r.shown)}</span>
+                  <span style={{width:92,textAlign:"right"}}>{fmt(r.calc)}</span>
+                </div>
+              ))}
+              {audit.diff ? (
+                <>
+                  <div style={{fontSize:12,color:T.sub,lineHeight:1.6,margin:"12px 0"}}>
+                    Les lignes en jaune diffèrent. Si la colonne « Historique » te semble juste, corrige : les soldes affichés seront remplacés par ces chiffres.
+                  </div>
+                  <button onClick={applyAudit} style={{width:"100%",padding:"11px 0",borderRadius:10,border:"none",background:T.accent,color:T.accentBtn,fontSize:13,fontWeight:800,cursor:"pointer"}}>Corriger d'après l'historique</button>
+                </>
+              ) : (
+                <div style={{fontSize:12,color:T.accentText,marginTop:12,fontWeight:700}}>✓ Tout concorde avec l'historique.</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div style={{padding:"16px 20px 32px"}}>
@@ -2268,7 +2321,8 @@ export default function App() {
 
   function submit() {
     if(!amt) return;
-    const tx={ id:uid(), date:new Date(txDate).toISOString(), type:addMode, amount:amt, label, note, incomeType, subcatId, recur, ...(addMode==="income"&&resetBars?{resetBars:true}:{}) };
+    const tx={ id:uid(), date:new Date(txDate).toISOString(), type:addMode, amount:amt, label, note, incomeType, subcatId, recur, ...(addMode==="income"&&resetBars?{resetBars:true}:{}),
+      ...(addMode==="income"&&incomeRules[incomeType]?{split:{...incomeRules[incomeType].split}}:{}) };
 
     if(addMode==="income"){
       const rule=incomeRules[incomeType];
@@ -2338,52 +2392,26 @@ export default function App() {
     setTimeout(()=>setTab("home"), 1200);
   }
 
-  function recalcBal(remainingTxs) {
-    // Start from zero, replay all transactions
-    const nb = {};
-    envelopes.forEach(e => nb[e.id] = 0);
-    const nm = {};
-    // txs est stocké du plus récent au plus ancien → on rejoue dans l'ordre chronologique
-    // (sinon les dépenses sont soustraites avant les revenus et le max = solde actuel → barres à 100%)
-    const ordered = remainingTxs
-      .map((tx,i)=>({tx,i}))
-      .sort((a,b)=>{
-        const d = new Date(a.tx.date) - new Date(b.tx.date);
-        return d !== 0 ? d : b.i - a.i; // égalité de date : le plus bas dans la liste = le plus ancien
-      })
-      .map(o=>o.tx);
-    ordered.forEach(tx => {
-      if(tx.type==="income") {
-        const rule = incomeRules[tx.incomeType];
-        // même règle que submit() (applyIncome) : référence qui ne baisse pas, sauf cycle vide ou remise à 100 % manuelle
-        if(rule) applyIncome(nb, nm, rule.split, tx.amount, envelopes.map(e=>e.id), tx.resetBars);
-      } else {
-        // directEnvelopeId : transaction urgence sans subcat (ex: Urgence Trésorerie)
-        if(tx.directEnvelopeId) {
-          nb[tx.directEnvelopeId] = (nb[tx.directEnvelopeId]||0) - tx.amount;
-        } else {
-          const sc = subcats.find(s=>s.id===tx.subcatId);
-          // fallbackOnly = true → l'enveloppe principale n'a rien payé, ne pas la débiter
-          if(sc?.envelopeId && !tx.fallbackOnly) {
-            nb[sc.envelopeId] = (nb[sc.envelopeId]||0) - tx.amount;
-          }
-          if(tx.fallbackEnvId && tx.fallbackCovered) {
-            nb[tx.fallbackEnvId] = (nb[tx.fallbackEnvId]||0) - tx.fallbackCovered;
-          }
-        }
-      }
-    });
-    // Les versements SF sont déjà dans l'historique des transactions (subcatId → trésorerie)
-    // Pas besoin de déduire sfTotal ici — ça causerait une double déduction
-    setBal(nb);
-    setEnvMax(nm);
+  // Références des barres : rejeu de l'historique (même logique que la synchro, voir syncCore.js).
+  // Soldes : si une transaction vient d'être supprimée, on annule UNIQUEMENT son effet sur les soldes actuels.
+  // Un rejeu complet ferait ressortir d'un coup tous les écarts d'anciennes transactions (chiffres inexpliqués).
+  function recalcBal(remainingTxs, removedTx) {
+    const r = recalcPure(remainingTxs, envelopes, subcats, incomeRules);
+    setEnvMax(r.max);
+    if (removedTx) {
+      const ids = new Set(envelopes.map(e=>e.id));
+      setBal(b=>balAfterDelete(b, removedTx, ids, subcats, incomeRules));
+    } else {
+      setBal(r.bal);
+    }
   }
 
   function deleteTx(txId) {
     addTombstones(pid, [txId]);
+    const removed = txs.find(t=>t.id===txId);
     const remaining = txs.filter(t=>t.id!==txId);
     setTxs(remaining);
-    recalcBal(remaining);
+    recalcBal(remaining, removed);
   }
 
   function addSinkingFund() {
@@ -2408,7 +2436,7 @@ export default function App() {
     if(!f||amount>f.current) return;
     // C'est ici qu'on déduit vraiment de la Trésorerie — au moment de l'utilisation réelle
     const sc = subcats.find(s=>s.envelopeId==="tresorerie");
-    const tx = { id:uid(), date:new Date().toISOString(), type:"expense", amount, label:`${label} (SF)`, note:`Sinking Fund — ${f.label}`, subcatId:sc?.id||"", incomeType:"", recur:"none" };
+    const tx = { id:uid(), date:new Date().toISOString(), type:"expense", amount, label:`${label} (SF)`, note:`Sinking Fund — ${f.label}`, subcatId:sc?.id||"", directEnvelopeId:"tresorerie", incomeType:"", recur:"none" };
     setTxs(t=>[tx,...t]);
     setBal(b=>({...b, tresorerie:(b.tresorerie||0)-amount}));
     if(afterAction==="close") {
@@ -2443,7 +2471,8 @@ export default function App() {
     }
 
     function doRecord(fromEnvId, shortage) {
-      const tx={ id:uid(), date:new Date().toISOString(), type:"expense", amount:re.amount, label:re.label, note:"Récurrent", incomeType:"", subcatId:re.subcatId, recur:re.period };
+      const tx={ id:uid(), date:new Date().toISOString(), type:"expense", amount:re.amount, label:re.label, note:"Récurrent", incomeType:"", subcatId:re.subcatId, recur:re.period,
+        ...(fromEnvId?{ fallbackEnvId:fromEnvId, fallbackCovered:re.amount, fallbackOnly:true }:{}) };
       setBal(b=>{
         const nb={...b};
         if(fromEnvId) {
@@ -2816,6 +2845,8 @@ export default function App() {
               setCurrency={setCurrency}
               setSeuils={setSeuils}
               setCoussin={setCoussin}
+              setBal={setBal}
+              setEnvMax={setEnvMax}
               onToggleTheme={toggleTheme}
               onClose={()=>setProfSettings(null)}
             />
