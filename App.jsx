@@ -572,16 +572,44 @@ function useSwipeDelete(onDelete) {
     setSwiping(false);
     setSwipeX(prev => prev < -OPEN_THRESHOLD ? -OPEN_SNAP : 0);
   }
+  // Souris (PC) : glisser avec le bouton enfoncé
+  const dragged = useRef(false);
+  function onMouseDown(e) {
+    if (e.button !== 0) return;
+    startX.current = e.clientX;
+    dragged.current = false;
+    const base = swipeX;
+    setSwiping(true);
+    function move(ev) {
+      const dx = ev.clientX - startX.current;
+      if (Math.abs(dx) > 5) dragged.current = true;
+      if (!dragged.current) return;
+      ev.preventDefault();
+      setSwipeX(Math.min(0, Math.max(base + dx, -OPEN_SNAP)));
+    }
+    function up() {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      setSwiping(false);
+      setSwipeX(prev => prev < -OPEN_THRESHOLD ? -OPEN_SNAP : 0);
+    }
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }
+  // Évite que le clic déclenché au relâchement d'un glissement ouvre/ferme la ligne
+  function onClickCapture(e) {
+    if (dragged.current) { e.stopPropagation(); e.preventDefault(); dragged.current = false; }
+  }
   function close() { setSwipeX(0); }
   const isOpen = swipeX <= -OPEN_SNAP + 4;
 
-  return { swipeX, swiping, isOpen, onTouchStart, onTouchMove, onTouchEnd, close };
+  return { swipeX, swiping, isOpen, onTouchStart, onTouchMove, onTouchEnd, onMouseDown, onClickCapture, close };
 }
 
 // ─── TX ROW ───────────────────────────────────────────────────────────────────
 function TxRow({ tx, onDelete, subcats, envelopes, incomeRules, last }) {
   const [open, setOpen] = useState(false);
-  const { swipeX, swiping, isOpen, onTouchStart, onTouchMove, onTouchEnd, close: swClose } = useSwipeDelete(onDelete);
+  const { swipeX, swiping, isOpen, onTouchStart, onTouchMove, onTouchEnd, onMouseDown, onClickCapture, close: swClose } = useSwipeDelete(onDelete);
   const isInc = tx.type === "income";
   const sc = subcats.find(s => s.id === tx.subcatId);
   const env = envelopes.find(e => e.id === sc?.envelopeId);
@@ -596,7 +624,7 @@ function TxRow({ tx, onDelete, subcats, envelopes, incomeRules, last }) {
       </div>
       {/* Row content */}
       <div
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onMouseDown={onMouseDown} onClickCapture={onClickCapture}
         style={{transform:`translateX(${swipeX}px)`,transition:swiping?"none":"transform .2s ease",background:T.card,position:"relative",zIndex:1}}>
         <div onClick={()=>{ if(swipeX<0){swClose();return;} setOpen(!open); }}
           style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",cursor:"pointer",borderBottom:(!last||open)?`1px solid ${T.border}`:"none"}}>
@@ -647,7 +675,7 @@ function RecurRow({ re, subcats, envelopes, onPay, onToggle, onDelete }) {
         onClick={()=>{ sw.close(); onDelete(re.id); }}>
         <span style={{fontSize:20}}>🗑</span>
       </div>
-      <div onTouchStart={sw.onTouchStart} onTouchMove={sw.onTouchMove} onTouchEnd={sw.onTouchEnd}
+      <div onTouchStart={sw.onTouchStart} onTouchMove={sw.onTouchMove} onTouchEnd={sw.onTouchEnd} onMouseDown={sw.onMouseDown} onClickCapture={sw.onClickCapture}
         onClick={()=>{ if(sw.isOpen) sw.close(); }}
         style={{transform:`translateX(${sw.swipeX}px)`,transition:sw.swiping?"none":"transform .2s ease",background:T.card,borderRadius:14,padding:"14px 16px",border:`1.5px solid ${overdue?"#F87171":urgent?"#FBBF24":T.border}`,opacity:re.active?1:0.5,position:"relative",zIndex:1}}>
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:8}}>
@@ -704,7 +732,7 @@ function EnvRow({ env, isLast, editingColor, editingEnv, editingLabel, setEC, se
   return (
     <div style={{position:"relative",overflow:"hidden"}}>
       {canDelete&&<div style={{position:"absolute",right:0,top:0,bottom:0,width:sw.isOpen?72:0,background:"#DC2626",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",transition:sw.swiping?"none":"width .2s ease"}} onClick={()=>{sw.close();doDelete();}}><span style={{fontSize:20}}>🗑</span></div>}
-      <div onTouchStart={canDelete?sw.onTouchStart:undefined} onTouchMove={canDelete?sw.onTouchMove:undefined} onTouchEnd={canDelete?sw.onTouchEnd:undefined}
+      <div onTouchStart={canDelete?sw.onTouchStart:undefined} onTouchMove={canDelete?sw.onTouchMove:undefined} onTouchEnd={canDelete?sw.onTouchEnd:undefined} onMouseDown={canDelete?sw.onMouseDown:undefined} onClickCapture={canDelete?sw.onClickCapture:undefined}
         style={{transform:`translateX(${sw.swipeX}px)`,transition:sw.swiping?"none":"transform .2s ease",background:T.card,position:"relative",zIndex:1}}>
         <div style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderBottom:(isLast&&editingColor!==env.id)?undefined:`1px solid ${T.border}`}}>
           <div onClick={()=>setEC(editingColor===env.id?null:env.id)} style={{width:22,height:22,borderRadius:"50%",background:env.color,flexShrink:0,cursor:"pointer",border:editingColor===env.id?`2px solid ${T.text}`:"2px solid transparent",transition:"border .15s"}}/>
@@ -743,7 +771,7 @@ function SubcatRow({ sc, env, subcats, setSub, editingSubcat, setESC, editingSub
   return (
     <div style={{position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",right:0,top:0,bottom:0,width:sw.isOpen?72:0,background:"#DC2626",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",transition:sw.swiping?"none":"width .2s ease"}} onClick={()=>{sw.close();doDelete();}}><span style={{fontSize:20}}>🗑</span></div>
-      <div onTouchStart={sw.onTouchStart} onTouchMove={sw.onTouchMove} onTouchEnd={sw.onTouchEnd}
+      <div onTouchStart={sw.onTouchStart} onTouchMove={sw.onTouchMove} onTouchEnd={sw.onTouchEnd} onMouseDown={sw.onMouseDown} onClickCapture={sw.onClickCapture}
         style={{transform:`translateX(${sw.swipeX}px)`,transition:sw.swiping?"none":"transform .2s ease",background:T.card,position:"relative",zIndex:1}}>
         <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:isLast?undefined:`1px solid ${T.border}`}}>
           <span style={{width:8,height:8,borderRadius:"50%",background:env.color,flexShrink:0}}/>
@@ -765,7 +793,7 @@ function IRRow({ k, r, incomeRules, setIR, editingIR, setEIR, editingIRLabel, se
   return (
     <div style={{position:"relative",overflow:"hidden",marginBottom:16,borderRadius:8}}>
       {canDelete&&<div style={{position:"absolute",right:0,top:0,bottom:0,width:sw.isOpen?72:0,background:"#DC2626",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",borderRadius:sw.isOpen?"0 8px 8px 0":0,overflow:"hidden",transition:sw.swiping?"none":"width .2s ease"}} onClick={()=>{sw.close();doDelete();}}><span style={{fontSize:20}}>🗑</span></div>}
-      <div onTouchStart={canDelete?sw.onTouchStart:undefined} onTouchMove={canDelete?sw.onTouchMove:undefined} onTouchEnd={canDelete?sw.onTouchEnd:undefined}
+      <div onTouchStart={canDelete?sw.onTouchStart:undefined} onTouchMove={canDelete?sw.onTouchMove:undefined} onTouchEnd={canDelete?sw.onTouchEnd:undefined} onMouseDown={canDelete?sw.onMouseDown:undefined} onClickCapture={canDelete?sw.onClickCapture:undefined}
         style={{transform:`translateX(${sw.swipeX}px)`,transition:sw.swiping?"none":"transform .2s ease",position:"relative",zIndex:1}}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
           <span style={{fontSize:18}}>{r.icon}</span>
@@ -851,7 +879,7 @@ function SinkingCard({ fund, onDelete, onAdd, onUse, tresorerie, totalAlloue }) 
         <span style={{fontSize:20}}>🗑</span>
       </div>
       {/* Card content */}
-      <div onTouchStart={sw.onTouchStart} onTouchMove={sw.onTouchMove} onTouchEnd={sw.onTouchEnd}
+      <div onTouchStart={sw.onTouchStart} onTouchMove={sw.onTouchMove} onTouchEnd={sw.onTouchEnd} onMouseDown={sw.onMouseDown} onClickCapture={sw.onClickCapture}
         style={{transform:`translateX(${sw.swipeX}px)`,transition:sw.swiping?"none":"transform .2s ease",position:"relative",zIndex:1}}>
     <div style={{background:T.card2,borderRadius:14,padding:"14px 16px",border:`1px solid ${isGoalReached?T.accent+"60":T.border}`}}>
 
